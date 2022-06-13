@@ -1,0 +1,11 @@
+obj
+bin
+doc
+.antlr
+.vs
+.vscode
+*.filters
+*.user
+TestResults
+CoverageResults
+node_modules

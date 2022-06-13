@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+
+    <RootNamespace>Squint.Compiler</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Squint.g4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.10.0" />
+    <PackageReference Include="Antlr4BuildTasks" Version="10.0">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
+    <PackageReference Include="Basic.Reference.Assemblies" Version="1.2.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Antlr4 Include="Squint.g4">
+      <Listener>false</Listener>
+      <Visitor>true</Visitor>
+      <GAtn>false</GAtn>
+      <Package>Compiler.Syntax</Package>
+      <Error>true</Error>
+    </Antlr4>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn>3021;1701;1702</NoWarn>
+  </PropertyGroup>
+
+</Project>
