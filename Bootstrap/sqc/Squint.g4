@@ -92,6 +92,7 @@ atom_expression : int_literal
                 | for_expression
                 | match_expression
                 | array_expression
+                | 'this'
                 ;
 
 expression_list : (expression (',' expression)* ','?)? ;
