@@ -129,8 +129,11 @@ match_expression_arm : pattern '->' expression ;
 match_statement : 'match' expression 'with' '{' (match_statement_arm (',' match_statement_arm)* ','?)? '}' ;
 match_statement_arm : pattern '->' statement ;
 
-pattern : '_' # discard_pattern
+pattern : '_'                       # discard_pattern
+        | name                      # name_pattern
+        | name '(' pattern_list ')' # destructure_pattern
         ;
+pattern_list : (pattern (',' pattern)* ','?)? ;
 
 name : IDENTIFIER;
 int_literal : INT_LITERAL;
