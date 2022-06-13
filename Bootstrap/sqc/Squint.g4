@@ -8,6 +8,7 @@ declaration : function_declaration
             | variable_declaration
             | import_declaration
             | type_declaration
+            | impl_declaration
             ;
 
 import_declaration : 'import' path+=name ('.' path+=name)* ';' ;
@@ -17,16 +18,42 @@ function_declaration : function_signature block_statement
                      ;
 function_signature : 'func' name generic_param_list? '(' parameter_list  ')' (':' return_type=type)? ;
 
-type_declaration : 'type' name generic_param_list? '=' '|'? type_ctor ('|' type_ctor)* ';' ;
-type_ctor : name ( '(' parameter_list ')' )? ;
+type_declaration : record_type_declaration
+                 | du_type_declaration
+                 | trait_declaration
+                 | type_alias_declaration
+                 ;
 
-variable_declaration : 'var' name (':' type)? ('=' value=expression)? ';' ;
+type_declaration_member_list : (type_declaration_member (',' type_declaration_member)* ','?)? ;
+type_declaration_member : ('var' | 'val') name (':' type) ;
+
+record_type_declaration : 'type' name generic_param_list? ('(' type_declaration_member_list ')')?  ';' ;
+
+du_type_declaration : 'enum' name generic_param_list? '{' (du_type_ctor (',' du_type_ctor)* ','?)? '}' ;
+du_type_ctor : name '(' type_declaration_member_list ')' ;
+
+trait_declaration : 'trait' name generic_param_list? '{' trait_member* '}' ;
+
+trait_member : function_signature ';' # trait_function
+             ;
+
+type_alias_declaration : 'type' name generic_param_list? '=' type ';' ;
+
+impl_declaration : 'impl' type '{' impl_member_declaration* '}'            # simple_impl_declaration
+                 | 'impl' type 'for' type '{' impl_member_declaration* '}' # subtype_impl_declaration
+                 ;
+
+impl_member_declaration : function_declaration ;
+
+variable_declaration : ('var' | 'val') name (':' type)? ('=' value=expression)? ';' ;
 
 generic_param_list : '[' (name (',' name)* ','?)? ']' ;
 generic_arg_list : '[' (type (',' type)* ','?)? ']' ;
 
 parameter_list : (parameter (',' parameter)* ','?)? ;
-parameter : name ':' type ;
+parameter : name ':' type # typed_parameter
+          | 'this'        # this_parameter
+          ;
 
 statement : 'return' value=expression? ';' # return_statement
           | declaration                    # declaration_statement
@@ -34,6 +61,7 @@ statement : 'return' value=expression? ';' # return_statement
           | while_statement                # keep_statement
           | for_statement                  # keep_statement
           | block_statement                # keep_statement
+          | match_statement                # keep_statement
           | expression ';'                 # expression_statement
           ;
 
@@ -62,6 +90,7 @@ atom_expression : int_literal
                 | if_expression
                 | while_expression
                 | for_expression
+                | match_expression
                 | array_expression
                 ;
 
@@ -93,6 +122,15 @@ while_statement  : 'while' condition=expression 'do' body=statement ;
 
 for_expression : 'for' iterator=name 'in' iterable=expression 'do' body=expression ;
 for_statement  : 'for' iterator=name 'in' iterable=expression 'do' body=statement ;
+
+match_expression : 'match' expression 'with' '{' (match_expression_arm (',' match_expression_arm)* ','?)? '}' ;
+match_expression_arm : pattern '->' expression ;
+
+match_statement : 'match' expression 'with' '{' (match_statement_arm (',' match_statement_arm)* ','?)? '}' ;
+match_statement_arm : pattern '->' statement ;
+
+pattern : '_' # discard_pattern
+        ;
 
 name : IDENTIFIER;
 int_literal : INT_LITERAL;
