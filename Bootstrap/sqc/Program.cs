@@ -6,11 +6,6 @@ using Compiler.Syntax;
 
 namespace Squint.Compiler;
 
-internal class FooVisitor : AstVisitor<object>
-{
-    public void Foo(Ast ast) => this.Visit(ast);
-}
-
 internal class Program
 {
     private static IParseTree ParseSyntaxTree(string text)
@@ -27,6 +22,7 @@ internal class Program
         var text = File.ReadAllText("test.squint");
         var parseTree = ParseSyntaxTree(text);
         var ast = AstConverter.ToAst(parseTree);
-        new FooVisitor().Foo(ast);
+        SymbolResolution.Resolve(ast);
+        var code = Codegen.Generate(ast);
     }
 }
