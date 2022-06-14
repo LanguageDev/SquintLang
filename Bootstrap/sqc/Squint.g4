@@ -39,8 +39,8 @@ trait_member : function_signature ';' # trait_function
 
 type_alias_declaration : 'type' name generic_param_list? '=' type ';' ;
 
-impl_declaration : 'impl' type '{' impl_member_declaration* '}'            # simple_impl_declaration
-                 | 'impl' type 'for' type '{' impl_member_declaration* '}' # subtype_impl_declaration
+impl_declaration : 'impl' type '{' impl_member_declaration* '}'
+                 | 'impl' type 'for' type '{' impl_member_declaration* '}'
                  ;
 
 impl_member_declaration : function_declaration ;

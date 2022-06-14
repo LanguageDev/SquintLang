@@ -20,6 +20,7 @@ internal class Program
     private static void Main(string[] args)
     {
         var text = File.ReadAllText("test.squint");
-        var tree = ParseSyntaxTree(text);
+        var parseTree = ParseSyntaxTree(text);
+        var ast = AstConverter.ToAst(parseTree);
     }
 }
