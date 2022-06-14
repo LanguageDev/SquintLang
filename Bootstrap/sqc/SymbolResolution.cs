@@ -116,6 +116,9 @@ public static class SymbolResolution
 
         protected override object Visit(Decl.Func func)
         {
+            func.Signature.Symbol = new(func.Signature.Name, SymbolKind.Func);
+            this.currentScope.Define(func.Signature.Symbol);
+
             this.PushScope();
             base.Visit(func);
             this.PopScope();

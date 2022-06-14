@@ -357,6 +357,8 @@ public abstract class AstVisitor<TResult>
         Expr.MemberCall v => this.Visit(v),
         Expr.This v => this.Visit(v),
         Expr.Index v => this.Visit(v),
+        Expr.If v => this.Visit(v),
+        Expr.While v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -492,6 +494,21 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
+    protected virtual TResult Visit(Expr.If @if)
+    {
+        this.Visit(@if.Cond);
+        this.Visit(@if.Then);
+        this.VisitOpt(@if.Else);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.While @while)
+    {
+        this.Visit(@while.Cond);
+        this.Visit(@while.Body);
+        return this.Default;
+    }
+
     private void VisitAll(IEnumerable<Stmt> stmts)
     {
         foreach (var d in stmts) this.Visit(d);
@@ -558,6 +575,8 @@ public abstract class AstTransformer
         Expr.MemberCall v => this.Transform(v),
         Expr.This v => this.Transform(v),
         Expr.Index v => this.Transform(v),
+        Expr.If v => this.Transform(v),
+        Expr.While v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -637,6 +656,15 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.Index index) => new Expr.Index(
         this.Transform(index.Indexed),
         this.TransformAll(index.Indices));
+
+    public virtual Expr Transform(Expr.If @if) => new Expr.If(
+        this.Transform(@if.Cond),
+        this.Transform(@if.Then),
+        this.TransformOpt(@if.Else));
+
+    public virtual Expr Transform(Expr.While @while) => new Expr.While(
+        this.Transform(@while.Cond),
+        this.Transform(@while.Body));
 
     private ImmutableList<Stmt> TransformAll(IEnumerable<Stmt> stmts) =>
         stmts.Select(this.Transform).ToImmutableList();
