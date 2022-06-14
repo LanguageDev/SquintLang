@@ -40,7 +40,6 @@ public abstract record class Ast
 
 public abstract record class Stmt : Ast
 {
-    public sealed record class Block(ImmutableList<Stmt> Stmts, Expr? Value) : Stmt;
     public sealed record class Return(Expr? Value) : Stmt;
     public sealed record class Exp(Expr Expr) : Stmt;
 }
@@ -99,6 +98,9 @@ public abstract record class Expr : Ast
     {
         public Symbol? Symbol { get; set; }
     }
+    public sealed record class Block(ImmutableList<Stmt> Stmts, Expr? Value) : Expr;
+    public sealed record class If(Expr Cond, Expr Then, Expr? Else) : Expr;
+    public sealed record class While(Expr Cond, Expr Body) : Expr;
     public sealed record class Call(Expr Called, ImmutableList<Expr> Args) : Expr;
     public sealed record class Ury(string Op, Expr Subexpr) : Expr;
     public sealed record class Bin(string Op, Expr Left, Expr Right) : Expr;
@@ -158,9 +160,9 @@ public static class AstConverter
                 }
             : new Decl.Func(
                 (Decl.FuncSignature)ToDecl(f.function_signature()),
-                new Stmt.Block(
+                new Stmt.Exp(new Expr.Block(
                     ImmutableList.Create<Stmt>(new Stmt.Return(ToExpr(f.expression()))),
-                    null))
+                    null)))
                     {
                         Attributes = ToAttributeList(f.attribute_list()),
                     },
@@ -179,12 +181,20 @@ public static class AstConverter
     private static Stmt ToStmt(IParseTree tree) => tree switch
     {
         SquintParser.Declaration_statementContext d => ToDecl(d.GetChild(0)),
+        SquintParser.Keep_statementContext d => ToStmt(d.GetChild(0)),
         SquintParser.Expression_statementContext e => new Stmt.Exp(ToExpr(e.expression())),
-        SquintParser.Block_statementContext b => new Stmt.Block(
+        SquintParser.Block_statementContext b => new Stmt.Exp(new Expr.Block(
             b.statement().Select(ToStmt).ToImmutableList(),
-            null),
+            null)),
         SquintParser.Return_statementContext r => new Stmt.Return(
             r.expression() is null ? null : ToExpr(r.expression())),
+        SquintParser.If_statementContext i => new Stmt.Exp(new Expr.If(
+            ToExpr(i.condition),
+            StmtToExpr(i.then),
+            StmtToExpr(i.els))),
+        SquintParser.While_statementContext w => new Stmt.Exp(new Expr.While(
+            ToExpr(w.condition),
+            StmtToExpr(w.body))),
         _ => throw new NotImplementedException(),
     };
 
@@ -216,6 +226,20 @@ public static class AstConverter
             mCall.args.expression().Select(ToExpr).ToImmutableList()),
         ITerminalNode term when term.GetText() == "this" => new Expr.This(),
         SquintParser.Relational_expressionContext rel => ToRelExpr(rel),
+        SquintParser.Block_expressionContext block => new Expr.Block(
+            block.statement().Select(ToStmt).ToImmutableList(),
+            block.expression() is null ? null : ToExpr(block.expression())),
+        SquintParser.If_expressionContext i => new Expr.If(
+            ToExpr(i.condition),
+            ToExpr(i.then),
+            i.els is null ? null : ToExpr(i.els)),
+        SquintParser.While_expressionContext w => new Expr.While(
+            ToExpr(w.condition),
+            ToExpr(w.body)),
+        SquintParser.Assign_expressionContext asgn => new Expr.Bin(
+            asgn.op.ToString(),
+            ToExpr(asgn.left),
+            ToExpr(asgn.right)),
         _ => throw new NotImplementedException(),
     };
 
@@ -275,6 +299,14 @@ public static class AstConverter
         if (attr.type_list() is not null) args = attr.type_list().type().Select(ToType).ToImmutableList();
         return new(attr.name().GetText(), args);
     }
+
+    private static Expr StmtToExpr(IParseTree? tree)
+    {
+        if (tree is null) return new Expr.Block(ImmutableList<Stmt>.Empty, null);
+
+        var stmt = ToStmt(tree);
+        return new Expr.Block(ImmutableList.Create(stmt), null);
+    }
 }
 
 public abstract class AstVisitor<TResult>
@@ -294,7 +326,6 @@ public abstract class AstVisitor<TResult>
     {
         Decl v => this.Visit(v),
         Stmt.Exp v => this.Visit(v),
-        Stmt.Block v => this.Visit(v),
         Stmt.Return v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
@@ -317,6 +348,7 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Expr expr) => expr switch
     {
         Expr.Name v => this.Visit(v),
+        Expr.Block v => this.Visit(v),
         Expr.Call v => this.Visit(v),
         Expr.Bin v => this.Visit(v),
         Expr.Rel v => this.Visit(v),
@@ -396,13 +428,6 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
-    protected virtual TResult Visit(Stmt.Block block)
-    {
-        this.VisitAll(block.Stmts);
-        this.VisitOpt(block.Value);
-        return this.Default;
-    }
-
     protected virtual TResult Visit(Stmt.Return @return)
     {
         this.VisitOpt(@return.Value);
@@ -418,6 +443,13 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Expr.Name name) => this.Default;
     protected virtual TResult Visit(Expr.Lit lit) => this.Default;
     protected virtual TResult Visit(Expr.This @this) => this.Default;
+
+    protected virtual TResult Visit(Expr.Block block)
+    {
+        this.VisitAll(block.Stmts);
+        this.VisitOpt(block.Value);
+        return this.Default;
+    }
 
     protected virtual TResult Visit(Expr.Call call)
     {
@@ -496,7 +528,6 @@ public abstract class AstTransformer
     {
         Decl v => this.Transform(v),
         Stmt.Exp v => this.Transform(v),
-        Stmt.Block v => this.Transform(v),
         Stmt.Return v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
@@ -518,6 +549,7 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr expr) => expr switch
     {
         Expr.Name v => this.Transform(v),
+        Expr.Block v => this.Transform(v),
         Expr.Call v => this.Transform(v),
         Expr.Bin v => this.Transform(v),
         Expr.Rel v => this.Transform(v),
@@ -568,10 +600,6 @@ public abstract class AstTransformer
     public virtual Decl Transform(Decl.Var var) =>
         new Decl.Var(var.Mutable, var.Name, this.TransformOpt(var.Type), this.TransformOpt(var.Value));
 
-    public virtual Stmt Transform(Stmt.Block block) => new Stmt.Block(
-        this.TransformAll(block.Stmts),
-        this.TransformOpt(block.Value));
-
     public virtual Stmt Transform(Stmt.Return @return) => new Stmt.Return(this.TransformOpt(@return.Value));
 
     public virtual Stmt Transform(Stmt.Exp exp) => new Stmt.Exp(this.Transform(exp.Expr));
@@ -579,6 +607,10 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.Name name) => name;
     public virtual Expr Transform(Expr.Lit lit) => lit;
     public virtual Expr Transform(Expr.This @this) => @this;
+
+    public virtual Expr Transform(Expr.Block block) => new Expr.Block(
+        this.TransformAll(block.Stmts),
+        this.TransformOpt(block.Value));
 
     public virtual Expr Transform(Expr.Call call) => new Expr.Call(
         this.Transform(call.Called),

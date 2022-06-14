@@ -122,14 +122,6 @@ public static class SymbolResolution
             return this.Default;
         }
 
-        protected override object Visit(Stmt.Block block)
-        {
-            this.PushScope();
-            base.Visit(block);
-            this.PopScope();
-            return this.Default;
-        }
-
         protected override object Visit(Decl.Record record)
         {
             record.Symbol = new(record.Name, SymbolKind.Type);
@@ -157,6 +149,14 @@ public static class SymbolResolution
                 var.Symbol = new(var.Name, SymbolKind.Global);
                 var.Scope!.Define(var.Symbol);
             }
+            return this.Default;
+        }
+
+        protected override object Visit(Expr.Block block)
+        {
+            this.PushScope();
+            base.Visit(block);
+            this.PopScope();
             return this.Default;
         }
     }
