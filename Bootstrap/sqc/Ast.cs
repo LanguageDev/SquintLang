@@ -199,3 +199,191 @@ public static class AstConverter
         return new Expr.Rel(left, rights.ToImmutable());
     }
 }
+
+public abstract class AstVisitor<TResult>
+{
+    public virtual TResult Default => default!;
+
+    protected virtual TResult Visit(Ast ast) => ast switch
+    {
+        Decl v => this.Visit(v),
+        Stmt v => this.Visit(v),
+        Expr v => this.Visit(v),
+        Pattern v => this.Visit(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    protected virtual TResult Visit(Stmt stmt) => stmt switch
+    {
+        Stmt.Exp v => this.Visit(v),
+        Stmt.Block v => this.Visit(v),
+        Stmt.Return v => this.Visit(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    protected virtual TResult Visit(Decl decl) => decl switch
+    {
+        Decl.Module v => this.Visit(v),
+        Decl.Import v => this.Visit(v),
+        Decl.Record v => this.Visit(v),
+        Decl.TypeMember v => this.Visit(v),
+        Decl.Impl v => this.Visit(v),
+        Decl.Func v => this.Visit(v),
+        Decl.FuncSignature v => this.Visit(v),
+        Decl.FuncParam v => this.Visit(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    protected virtual TResult Visit(Expr expr) => expr switch
+    {
+        Expr.Name v => this.Visit(v),
+        Expr.Call v => this.Visit(v),
+        Expr.Bin v => this.Visit(v),
+        Expr.Rel v => this.Visit(v),
+        Expr.Lit v => this.Visit(v),
+        Expr.MemberAccess v => this.Visit(v),
+        Expr.MemberCall v => this.Visit(v),
+        Expr.This v => this.Visit(v),
+        Expr.Index v => this.Visit(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    protected virtual TResult Visit(Pattern pattern) => pattern switch
+    {
+        _ => throw new NotImplementedException(),
+    };
+
+    protected virtual TResult Visit(Decl.Module module)
+    {
+        this.VisitAll(module.Decls);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Import import) => this.Default;
+
+    protected virtual TResult Visit(Decl.Record record)
+    {
+        this.VisitAll(record.Generics);
+        this.VisitAll(record.Members);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.TypeMember typeMember)
+    {
+        this.Visit(typeMember.Type);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Impl impl)
+    {
+        this.Visit(impl.Target);
+        this.VisitOpt(impl.Base);
+        this.VisitAll(impl.Decls);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Func func)
+    {
+        this.Visit(func.Signature as Decl);
+        this.Visit(func.Body);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.FuncSignature funcSignature)
+    {
+        this.VisitAll(funcSignature.Generics);
+        this.VisitAll(funcSignature.Params);
+        this.VisitOpt(funcSignature.Ret);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.FuncParam funcParam)
+    {
+        this.VisitOpt(funcParam.Type);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Stmt.Block block)
+    {
+        this.VisitAll(block.Stmts);
+        this.VisitOpt(block.Value);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Stmt.Return @return)
+    {
+        this.VisitOpt(@return.Value);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Stmt.Exp exp)
+    {
+        this.Visit(exp.Expr);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.Name name) => this.Default;
+    protected virtual TResult Visit(Expr.Lit lit) => this.Default;
+    protected virtual TResult Visit(Expr.This @this) => this.Default;
+
+    protected virtual TResult Visit(Expr.Call call)
+    {
+        this.Visit(call.Called);
+        this.VisitAll(call.Args);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.Bin bin)
+    {
+        this.Visit(bin.Left);
+        this.Visit(bin.Right);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.Rel rel)
+    {
+        this.Visit(rel.Left);
+        this.VisitAll(rel.Rights.Select(r => r.Right));
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.MemberAccess memberAccess)
+    {
+        this.Visit(memberAccess.Instance);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.MemberCall memberCall)
+    {
+        this.Visit(memberCall.Instance);
+        this.VisitAll(memberCall.Args);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.Index index)
+    {
+        this.Visit(index.Indexed);
+        this.VisitAll(index.Indices);
+        return this.Default;
+    }
+
+    private void VisitAll(IEnumerable<Stmt> stmts)
+    {
+        foreach (var d in stmts) this.Visit(d);
+    }
+
+    private void VisitAll(IEnumerable<Decl> decls)
+    {
+        foreach (var d in decls) this.Visit(d);
+    }
+
+    private void VisitAll(IEnumerable<Expr> exprs)
+    {
+        foreach (var d in exprs) this.Visit(d);
+    }
+
+    private void VisitOpt(Expr? expr)
+    {
+        if (expr is not null) this.Visit(expr);
+    }
+}
