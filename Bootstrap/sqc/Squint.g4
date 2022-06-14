@@ -11,7 +11,7 @@ declaration : function_declaration
             | impl_declaration
             ;
 
-import_declaration : 'import' path+=name ('.' path+=name)* ';' ;
+import_declaration : 'import' path+=name ('.' path+=name)* generic_param_list? ';' ;
 
 function_declaration : function_signature block_statement
                      | function_signature '=' expression ';'

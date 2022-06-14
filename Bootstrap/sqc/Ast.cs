@@ -29,7 +29,9 @@ public abstract record class Stmt : Ast
 public abstract record class Decl : Stmt
 {
     public sealed record class Module(ImmutableList<Decl> Decls) : Decl;
-    public sealed record class Import(ImmutableList<string> Parts) : Decl;
+    public sealed record class Import(
+        ImmutableList<string> Parts,
+        ImmutableList<GenericParam> Generics) : Decl;
     public sealed record class FuncSignature(
         string Name,
         ImmutableList<GenericParam> Generics,
@@ -40,7 +42,10 @@ public abstract record class Decl : Stmt
     }
     public sealed record class Func(FuncSignature Signature, Stmt Body) : Decl;
     public sealed record class GenericParam(string Name) : Decl;
-    public sealed record class FuncParam(string Name, Expr? Type) : Decl;
+    public sealed record class FuncParam(string Name, Expr? Type) : Decl
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class TypeMember(bool Mutable, string Name, Expr Type) : Decl;
     public sealed record class Record(
         string Name,
@@ -91,7 +96,8 @@ public static class AstConverter
         SquintParser.Impl_member_declarationContext mem => ToDecl(mem.GetChild(0)),
         SquintParser.FileContext file => new Decl.Module(file.declaration().Select(ToDecl).ToImmutableList()),
         SquintParser.Import_declarationContext import => new Decl.Import(
-            import.name().Select(n => n.GetText()).ToImmutableList()),
+            import.name().Select(n => n.GetText()).ToImmutableList(),
+            ToGenerics(import.generic_param_list())),
         SquintParser.Record_type_declarationContext rec => new Decl.Record(
             rec.name().GetText(),
             ToGenerics(rec.generic_param_list()),

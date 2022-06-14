@@ -16,6 +16,7 @@ public enum SymbolKind
 {
     Func,
     Type,
+    Local,
 }
 
 public sealed record class Symbol(string Name, SymbolKind Kind)
@@ -70,10 +71,16 @@ public static class SymbolResolution
             this.globalScope = MakeScope();
             this.currentScope = this.globalScope;
 
-            void DefineBuiltinType(string name) => this.globalScope.Define(new(name, SymbolKind.Type));
+            void DefineBuiltinType(string name, string? realName = null) =>
+                this.globalScope.Define(new(name, SymbolKind.Type)
+                {
+                    FullName = realName ?? name,
+                });
 
             DefineBuiltinType("string");
             DefineBuiltinType("int");
+            DefineBuiltinType("bool");
+            DefineBuiltinType("unit", "void");
         }
 
         private void PushScope() => this.currentScope = MakeScope(this.currentScope);
@@ -149,7 +156,7 @@ public static class SymbolResolution
 
         protected override object Visit(Decl.Import import)
         {
-            var item = Import(import.Parts);
+            var item = Import(import.Parts, import.Generics.Count);
             if (item is null) throw new InvalidOperationException();
 
             var symbol = null as Symbol;
@@ -178,10 +185,11 @@ public static class SymbolResolution
             return this.Default;
         }
 
-        private static MemberInfo? Import(ImmutableList<string> parts)
+        private static MemberInfo? Import(ImmutableList<string> parts, int argc)
         {
             // First try as a type
             var typePath = string.Join('.', parts);
+            if (argc > 0) typePath = $"{typePath}`{argc}";
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 var ty = assembly.GetType(typePath);
@@ -189,7 +197,7 @@ public static class SymbolResolution
             }
 
             // Try the first part as a type, second as a static function
-            if (parts.Count > 1)
+            if (parts.Count > 1 && argc == 0)
             {
                 typePath = string.Join('.', parts.SkipLast(1));
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
@@ -218,6 +226,19 @@ public static class SymbolResolution
         protected override object Visit(Expr.Name name)
         {
             name.Symbol = name.Scope!.Reference(name.Value);
+            return this.Default;
+        }
+
+        protected override object Visit(Decl.Func func)
+        {
+            foreach (var p in func.Signature.Params)
+            {
+                this.Visit(p);
+                p.Symbol = new(p.Name, SymbolKind.Local);
+                func.Body.Scope!.Define(p.Symbol);
+            }
+            if (func.Signature.Ret is not null) this.Visit(func.Signature.Ret);
+            this.Visit(func.Body);
             return this.Default;
         }
     }

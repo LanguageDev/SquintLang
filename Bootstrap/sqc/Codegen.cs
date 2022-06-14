@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -81,10 +82,11 @@ public sealed class Codegen : AstVisitor<string>
     private string GetTypeString(Expr expr) => expr switch
     {
         Expr.Name name => name.Symbol!.FullName,
+        Expr.Index index => $"{this.GetTypeString(index.Indexed)}<{string.Join(", ", index.Indices.Select(GetTypeString))}>",
         _ => throw new NotImplementedException(),
     };
 
-    private string DeVoid(string expr) => $"Prelude.DeVoid(() => {expr})";
+    private static string DeVoid(string expr) => $"Prelude.DeVoid(() => {expr})";
 
     private void DumpPrelude() => this.CodeBuilder
         .AppendLine(@"
@@ -116,9 +118,6 @@ public static class Prelude
 
     protected override string Visit(Decl.Impl impl)
     {
-        // TODO
-        if (impl.Base is not null) throw new NotImplementedException();
-
         var typeSymbol = impl.Target switch
         {
             Expr.Name n => n.Symbol!,
@@ -126,6 +125,9 @@ public static class Prelude
         };
 
         var typeBuilder = this.GetTypeBuilder(typeSymbol);
+
+        if (impl.Base is not null) typeBuilder.Bases.Add(this.GetTypeString(impl.Base));
+
         this.PushContext(typeBuilder.CodeBuilder);
         foreach (var decl in impl.Decls) this.Visit(decl);
         this.PopContext();
@@ -135,7 +137,7 @@ public static class Prelude
 
     protected override string Visit(Decl.Func func)
     {
-        var retType = func.Signature.Ret is null ? "Unit" : this.GetTypeString(func.Signature.Ret);
+        var retType = func.Signature.Ret is null ? "void" : this.GetTypeString(func.Signature.Ret);
         var isInstance = func.Signature.Params.Count > 0 && func.Signature.Params[0].Name == "this";
 
         var relParams = isInstance ? func.Signature.Params.Skip(1) : func.Signature.Params;
@@ -148,10 +150,22 @@ public static class Prelude
 
         this.Visit(func.Body);
 
-        if (retType == "Unit") this.CodeBuilder.AppendLine("return default(Unit);");
-
         this.CodeBuilder.AppendLine("}");
 
+        return this.Default;
+    }
+
+    protected override string Visit(Stmt.Return @return)
+    {
+        if (@return.Value is null)
+        {
+            this.CodeBuilder.AppendLine("return;");
+        }
+        else
+        {
+            var res = this.Visit(@return.Value);
+            this.CodeBuilder.AppendLine($"return {res};");
+        }
         return this.Default;
     }
 
@@ -171,11 +185,79 @@ public static class Prelude
 
     protected override string Visit(Expr.Bin bin)
     {
-        var left = this.Visit(bin.Left);
-        var right = this.Visit(bin.Right);
-
         var res = this.TmpName();
-        this.CodeBuilder.AppendLine($"var {res} = {left} {bin.Op} {right};");
+        var op = bin.Op switch
+        {
+            "and" => "&&",
+            _ => bin.Op,
+        };
+
+        if (op == "&&")
+        {
+            this.CodeBuilder.AppendLine($"var {res} = false;");
+            var left = this.Visit(bin.Left);
+            this.CodeBuilder
+                .AppendLine($"if ({left})")
+                .AppendLine("{");
+            var right = this.Visit(bin.Right);
+            this.CodeBuilder
+                .AppendLine($"if ({right})")
+                .AppendLine("{");
+            this.CodeBuilder.AppendLine($"{res} = true;");
+            this.CodeBuilder
+                .AppendLine("}")
+                .AppendLine("}");
+        }
+        else if (op == "||")
+        {
+            this.CodeBuilder.AppendLine($"var {res} = false;");
+            var left = this.Visit(bin.Left);
+            this.CodeBuilder
+                .AppendLine($"if ({left})")
+                .AppendLine("{")
+                .AppendLine($"{res} = true")
+                .AppendLine("}")
+                .AppendLine("else")
+                .AppendLine("{");
+            var right = this.Visit(bin.Right);
+            this.CodeBuilder
+                .AppendLine($"if ({right})")
+                .AppendLine("{");
+            this.CodeBuilder.AppendLine($"{res} = true;");
+            this.CodeBuilder
+                .AppendLine("}")
+                .AppendLine("}");
+        }
+        else
+        {
+            var left = this.Visit(bin.Left);
+            var right = this.Visit(bin.Right);
+
+            this.CodeBuilder.AppendLine($"var {res} = {left} {op} {right};");
+        }
+
+        return res;
+    }
+
+    protected override string Visit(Expr.Rel rel)
+    {
+        var res = this.TmpName();
+        this.CodeBuilder.AppendLine($"var {res} = false;");
+
+        Debug.Assert(rel.Rights.Count > 0);
+        var last = this.Visit(rel.Left);
+        foreach (var (op, rightExp) in rel.Rights)
+        {
+            var right = this.Visit(rightExp);
+            var tmp = this.TmpName();
+            this.CodeBuilder
+                .AppendLine($"var {tmp} = {last} {op} {right};")
+                .AppendLine($"if ({tmp})")
+                .AppendLine("{");
+            last = right;
+        }
+        this.CodeBuilder.AppendLine($"{res} = true;");
+        foreach (var _ in rel.Rights) this.CodeBuilder.AppendLine("}");
 
         return res;
     }
