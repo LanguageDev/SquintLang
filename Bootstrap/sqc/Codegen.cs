@@ -17,7 +17,6 @@ public sealed class Codegen : AstVisitor<string>
     {
         var gen = new Codegen();
         gen.PushContext(gen.globalsBuilder);
-        gen.DumpPrelude();
         gen.Visit(ast);
         gen.PopContext();
         return gen.Code;
@@ -50,9 +49,25 @@ public sealed class Codegen : AstVisitor<string>
         }
     }
 
-    public string Code =>
-        this.globalsBuilder.ToString() + "\n" +
-        string.Join("\n", this.types.Values.Select(b => b.Code));
+    public string Code => $@"
+public readonly struct Unit {{ }}
+public static class Prelude
+{{
+    public static T DeVoid<T>(System.Func<T> f) => f();
+    public static Unit DeVoid(System.Action f)
+    {{
+        f();
+        return default(Unit);
+    }}
+}}
+
+public static class Globals
+{{
+    {this.globalsBuilder}
+}}
+
+{string.Join("\n", this.types.Values.Select(b => b.Code))}
+";
 
     private readonly Dictionary<Symbol, TypeBuilder> types = new();
     private readonly StringBuilder globalsBuilder = new();
@@ -87,20 +102,6 @@ public sealed class Codegen : AstVisitor<string>
     };
 
     private static string DeVoid(string expr) => $"Prelude.DeVoid(() => {expr})";
-
-    private void DumpPrelude() => this.CodeBuilder
-        .AppendLine(@"
-public readonly struct Unit {}
-public static class Prelude
-{
-    public static T DeVoid<T>(System.Func<T> f) => f();
-    public static Unit DeVoid(System.Action f)
-    {
-        f();
-        return default(Unit);
-    }
-}
-".Trim());
 
     protected override string Visit(Decl.Record record)
     {
