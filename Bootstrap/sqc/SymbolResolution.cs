@@ -4,7 +4,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,7 +18,10 @@ public enum SymbolKind
     Type,
 }
 
-public sealed record class Symbol(string Name, SymbolKind Kind);
+public sealed record class Symbol(string Name, SymbolKind Kind)
+{
+    public string FullName { get; init; } = Name;
+}
 
 public sealed record class Scope(
     Scope? Parent,
@@ -144,8 +149,64 @@ public static class SymbolResolution
 
         protected override object Visit(Decl.Import import)
         {
-            // TODO
+            var item = Import(import.Parts);
+            if (item is null) throw new InvalidOperationException();
+
+            var symbol = null as Symbol;
+            var fullName = string.Join('.', import.Parts);
+            if (item is MethodInfo)
+            {
+                symbol = new(import.Parts[^1], SymbolKind.Func)
+                {
+                    FullName = fullName,
+                };
+            }
+            else if (item is Type)
+            {
+                symbol = new(import.Parts[^1], SymbolKind.Type)
+                {
+                    FullName = fullName,
+                };
+            }
+            else
+            {
+                throw new InvalidOperationException();
+            }
+
+            import.Scope!.Define(symbol);
+
             return this.Default;
+        }
+
+        private static MemberInfo? Import(ImmutableList<string> parts)
+        {
+            // First try as a type
+            var typePath = string.Join('.', parts);
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var ty = assembly.GetType(typePath);
+                if (ty is not null) return ty;
+            }
+
+            // Try the first part as a type, second as a static function
+            if (parts.Count > 1)
+            {
+                typePath = string.Join('.', parts.SkipLast(1));
+                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    var ty = assembly.GetType(typePath);
+                    if (ty is null) continue;
+
+                    var method = ty
+                        .GetMethods(BindingFlags.Public | BindingFlags.Static)
+                        .Where(m => m.Name == parts[^1])
+                        .FirstOrDefault();
+                    if (method is not null) return method;
+                }
+            }
+
+            // Not found
+            return null;
         }
     }
 
