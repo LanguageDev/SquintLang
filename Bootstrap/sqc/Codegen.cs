@@ -8,6 +8,8 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace Squint.Compiler;
 
@@ -49,7 +51,12 @@ public sealed class Codegen : AstVisitor<string>
         }
     }
 
-    public string Code => $@"
+    public string Code => SyntaxFactory.ParseCompilationUnit(this.CodeRaw)
+        .NormalizeWhitespace()
+        .GetText()
+        .ToString();
+
+    public string CodeRaw => $@"
 public readonly struct Unit {{ }}
 public static class Prelude
 {{
@@ -70,6 +77,7 @@ public static class Globals
 ";
 
     private readonly Dictionary<Symbol, TypeBuilder> types = new();
+    private readonly Dictionary<Symbol, string> variables = new();
     private readonly StringBuilder globalsBuilder = new();
     private readonly Stack<StringBuilder> codeStack = new();
     private int tmpCount;
@@ -80,6 +88,16 @@ public static class Globals
     private void PopContext() => this.codeStack.Pop();
 
     private string TmpName() => $"_tmp_{this.tmpCount++}";
+
+    private string GetLocalName(Symbol symbol)
+    {
+        if (!this.variables.TryGetValue(symbol, out var name))
+        {
+            name = $"_local_{this.variables.Count}";
+            this.variables.Add(symbol, name);
+        }
+        return name;
+    }
 
     private TypeBuilder GetTypeBuilder(Symbol symbol)
     {
@@ -107,12 +125,22 @@ public static class Globals
     {
         var builder = this.GetTypeBuilder(record.Symbol!);
 
+        // Properties
         foreach (var m in record.Members)
         {
             var ty = this.GetTypeString(m.Type);
             var getSet = m.Mutable ? "get; set;" : "get; init;";
-            builder.CodeBuilder.AppendLine($"    public {ty} {m.Name} {{ {getSet} }}");
+            builder.CodeBuilder.AppendLine($"public {ty} {m.Name} {{ {getSet} }}");
         }
+
+        // Ctor
+        builder.CodeBuilder
+            .Append($"public {record.Name}(")
+            .AppendJoin(", ", record.Members.Select(m => $"{this.GetTypeString(m.Type)} {m.Name}"))
+            .AppendLine(")")
+            .AppendLine("{");
+        foreach (var m in record.Members) builder.CodeBuilder.AppendLine($"this.{m.Name} = {m.Name};");
+        builder.CodeBuilder.AppendLine("}");
 
         return this.Default;
     }
@@ -140,11 +168,13 @@ public static class Globals
     {
         var retType = func.Signature.Ret is null ? "void" : this.GetTypeString(func.Signature.Ret);
         var isInstance = func.Signature.Params.Count > 0 && func.Signature.Params[0].Name == "this";
+        var isOverride = func.Attributes.Any(attr => attr.Name == "override");
 
         var relParams = isInstance ? func.Signature.Params.Skip(1) : func.Signature.Params;
         var stat = isInstance ? "" : "static ";
+        var ov = isOverride ? "override " : "";
         this.CodeBuilder
-            .Append($"public {stat}{retType} {func.Signature.Name}(")
+            .Append($"public {ov}{stat}{retType} {func.Signature.Name}(")
             .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {p.Name}"))
             .AppendLine(")")
             .AppendLine("{");
@@ -152,6 +182,27 @@ public static class Globals
         this.Visit(func.Body);
 
         this.CodeBuilder.AppendLine("}");
+
+        return this.Default;
+    }
+
+    protected override string Visit(Decl.Var var)
+    {
+        if (var.Type is null && var.Value is null) throw new NotImplementedException();
+
+        if (var.Scope!.IsGlobal)
+        {
+            if (var.Type is null) throw new NotImplementedException();
+            // TODO
+            throw new NotImplementedException();
+        }
+
+        var ty = var.Type is null ? "var" : this.GetTypeString(var.Type);
+        var value = var.Value is null ? null : this.Visit(var.Value);
+        var name = this.GetLocalName(var.Symbol!);
+
+        if (value is null) this.CodeBuilder.AppendLine($"{ty} {name};");
+        else this.CodeBuilder.AppendLine($"{ty} {name} = {value};");
 
         return this.Default;
     }
@@ -170,16 +221,29 @@ public static class Globals
         return this.Default;
     }
 
-    protected override string Visit(Expr.Name name) => name.Symbol!.FullName;
+    protected override string Visit(Expr.Name name) => name.Symbol!.Kind == SymbolKind.Local
+        ? this.GetLocalName(name.Symbol!)
+        : name.Symbol!.FullName;
 
     protected override string Visit(Expr.Call call)
     {
+        var isCtor = call.Called is Expr.Name name
+            && name.Symbol!.Kind == SymbolKind.Type;
+
         var func = this.Visit(call.Called);
         var args = call.Args.Select(this.Visit).ToList();
 
         var res = this.TmpName();
         var callExpr = $"{func}({string.Join(", ", args)})";
-        this.CodeBuilder.AppendLine($"var {res} = {DeVoid(callExpr)};");
+
+        if (isCtor)
+        {
+            this.CodeBuilder.AppendLine($"var {res} = new {callExpr};");
+        }
+        else
+        {
+            this.CodeBuilder.AppendLine($"var {res} = {DeVoid(callExpr)};");
+        }
 
         return res;
     }

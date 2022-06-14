@@ -17,6 +17,7 @@ public enum SymbolKind
     Func,
     Type,
     Local,
+    Global,
 }
 
 public sealed record class Symbol(string Name, SymbolKind Kind)
@@ -147,6 +148,17 @@ public static class SymbolResolution
             funcSignature.Scope!.Define(funcSignature.Symbol);
             return this.Default;
         }
+
+        protected override object Visit(Decl.Var var)
+        {
+            base.Visit(var);
+            if (var.Scope!.IsGlobal)
+            {
+                var.Symbol = new(var.Name, SymbolKind.Global);
+                var.Scope!.Define(var.Symbol);
+            }
+            return this.Default;
+        }
     }
 
     // Import resolution
@@ -239,6 +251,18 @@ public static class SymbolResolution
             }
             if (func.Signature.Ret is not null) this.Visit(func.Signature.Ret);
             this.Visit(func.Body);
+            return this.Default;
+        }
+
+        protected override object Visit(Decl.Var var)
+        {
+            base.Visit(var);
+            if (!var.Scope!.IsGlobal)
+            {
+                // Define local now
+                var.Symbol = new(var.Name, SymbolKind.Local);
+                var.Scope!.Define(var.Symbol);
+            }
             return this.Default;
         }
     }

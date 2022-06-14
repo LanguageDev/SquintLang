@@ -86,6 +86,10 @@ public abstract record class Decl : Stmt
         Expr Target,
         Expr? Base,
         ImmutableList<Decl> Decls) : Decl;
+    public sealed record class Var(bool Mutable, string Name, Expr? Type, Expr? Value) : Decl
+    {
+        public Symbol? Symbol { get; set; }
+    }
 }
 
 public abstract record class Expr : Ast
@@ -149,24 +153,38 @@ public static class AstConverter
             ? new Decl.Func(
                 (Decl.FuncSignature)ToDecl(f.function_signature()),
                 ToStmt(f.block_statement()))
+                {
+                    Attributes = ToAttributeList(f.attribute_list()),
+                }
             : new Decl.Func(
                 (Decl.FuncSignature)ToDecl(f.function_signature()),
                 new Stmt.Block(
                     ImmutableList.Create<Stmt>(new Stmt.Return(ToExpr(f.expression()))),
-                    null)),
+                    null))
+                    {
+                        Attributes = ToAttributeList(f.attribute_list()),
+                    },
         SquintParser.This_parameterContext => new Decl.FuncParam("this", null),
         SquintParser.Typed_parameterContext t => new Decl.FuncParam(
             t.name().GetText(),
             ToType(t.type())),
+        SquintParser.Variable_declarationContext v => new Decl.Var(
+            v.GetChild(0).GetText() == "var",
+            v.name().GetText(),
+            v.type() is null ? null : ToType(v.type()),
+            v.expression() is null ? null : ToExpr(v.expression())),
         _ => throw new NotImplementedException(),
     };
 
     private static Stmt ToStmt(IParseTree tree) => tree switch
     {
+        SquintParser.Declaration_statementContext d => ToDecl(d.GetChild(0)),
         SquintParser.Expression_statementContext e => new Stmt.Exp(ToExpr(e.expression())),
         SquintParser.Block_statementContext b => new Stmt.Block(
             b.statement().Select(ToStmt).ToImmutableList(),
             null),
+        SquintParser.Return_statementContext r => new Stmt.Return(
+            r.expression() is null ? null : ToExpr(r.expression())),
         _ => throw new NotImplementedException(),
     };
 
@@ -274,6 +292,7 @@ public abstract class AstVisitor<TResult>
 
     protected virtual TResult Visit(Stmt stmt) => stmt switch
     {
+        Decl v => this.Visit(v),
         Stmt.Exp v => this.Visit(v),
         Stmt.Block v => this.Visit(v),
         Stmt.Return v => this.Visit(v),
@@ -291,6 +310,7 @@ public abstract class AstVisitor<TResult>
         Decl.Func v => this.Visit(v),
         Decl.FuncSignature v => this.Visit(v),
         Decl.FuncParam v => this.Visit(v),
+        Decl.Var v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -366,6 +386,13 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Decl.FuncParam funcParam)
     {
         this.VisitOpt(funcParam.Type);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Var var)
+    {
+        this.VisitOpt(var.Type);
+        this.VisitOpt(var.Value);
         return this.Default;
     }
 
@@ -467,6 +494,7 @@ public abstract class AstTransformer
 
     public virtual Stmt Transform(Stmt stmt) => stmt switch
     {
+        Decl v => this.Transform(v),
         Stmt.Exp v => this.Transform(v),
         Stmt.Block v => this.Transform(v),
         Stmt.Return v => this.Transform(v),
@@ -483,6 +511,7 @@ public abstract class AstTransformer
         Decl.Func v => this.Transform(v),
         Decl.FuncSignature v => this.Transform(v),
         Decl.FuncParam v => this.Transform(v),
+        Decl.Var v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -523,9 +552,9 @@ public abstract class AstTransformer
         this.TransformOpt(impl.Base),
         this.TransformAll(impl.Decls));
 
-    public virtual Decl Transform(Decl.Func func) => new Decl.Func(
+    public virtual Decl Transform(Decl.Func func) => KeepAttr(func, new Decl.Func(
         (Decl.FuncSignature)this.Transform(func.Signature),
-        this.Transform(func.Body));
+        this.Transform(func.Body)));
 
     public virtual Decl Transform(Decl.FuncSignature funcSignature) => new Decl.FuncSignature(
         funcSignature.Name,
@@ -535,6 +564,9 @@ public abstract class AstTransformer
     
     public virtual Decl Transform(Decl.FuncParam funcParam) =>
         new Decl.FuncParam(funcParam.Name, this.TransformOpt(funcParam.Type));
+
+    public virtual Decl Transform(Decl.Var var) =>
+        new Decl.Var(var.Mutable, var.Name, this.TransformOpt(var.Type), this.TransformOpt(var.Value));
 
     public virtual Stmt Transform(Stmt.Block block) => new Stmt.Block(
         this.TransformAll(block.Stmts),

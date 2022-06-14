@@ -18,8 +18,8 @@ declaration : function_declaration
 
 import_declaration : 'import' path+=name ('.' path+=name)* generic_param_list? ';' ;
 
-function_declaration : function_signature block_statement
-                     | function_signature '=' expression ';'
+function_declaration : attribute_list function_signature block_statement
+                     | attribute_list function_signature '=' expression ';'
                      ;
 function_signature : 'func' name generic_param_list? '(' parameter_list  ')' (':' return_type=type)? ;
 

@@ -41,8 +41,17 @@ impl IEquatable[{target.Name}] for {target.Name} {{
 }}
 "),
         Expr.Name name when name.Value == "ToString" => (Decl)Ast.Parse($@"
-impl IEquatable[{target.Name}] for {target.Name} {{
-    func ToString(this): string = ""TODO"";
+import System.Text.StringBuilder;
+
+impl {target.Name} {{
+    #[override]
+    func ToString(this): string {{
+        var sb = StringBuilder();
+        sb.Append(""{target.Name}("");
+        {string.Join("sb.Append(\", \");", target.Members.Select(m => $"sb.Append(this.{m.Name}.ToString());"))}
+        sb.Append("")"");
+        return sb.ToString();
+    }}
 }}
 "),
         _ => throw new NotImplementedException(),
