@@ -237,7 +237,7 @@ public static class AstConverter
             ToExpr(w.condition),
             ToExpr(w.body)),
         SquintParser.Assign_expressionContext asgn => new Expr.Bin(
-            asgn.op.ToString(),
+            asgn.op.GetText(),
             ToExpr(asgn.left),
             ToExpr(asgn.right)),
         _ => throw new NotImplementedException(),

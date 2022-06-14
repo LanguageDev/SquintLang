@@ -81,6 +81,7 @@ public static class Globals
     private readonly StringBuilder globalsBuilder = new();
     private readonly Stack<StringBuilder> codeStack = new();
     private int tmpCount;
+    private int labelCount;
 
     private StringBuilder CodeBuilder => this.codeStack.Peek();
 
@@ -88,6 +89,7 @@ public static class Globals
     private void PopContext() => this.codeStack.Pop();
 
     private string TmpName() => $"_tmp_{this.tmpCount++}";
+    private string LabelName() => $"_label_{this.labelCount++}";
 
     private string GetLocalName(Symbol symbol)
     {
@@ -175,7 +177,7 @@ public static class Globals
         var ov = isOverride ? "override " : "";
         this.CodeBuilder
             .Append($"public {ov}{stat}{retType} {func.Signature.Name}(")
-            .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {p.Name}"))
+            .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {this.GetLocalName(p.Symbol!)}"))
             .AppendLine(")")
             .AppendLine("{");
 
@@ -219,6 +221,45 @@ public static class Globals
             this.CodeBuilder.AppendLine($"return {res};");
         }
         return this.Default;
+    }
+
+    protected override string Visit(Expr.Block block)
+    {
+        foreach (var s in block.Stmts) this.Visit(s);
+        return block.Value is null ? "default(Unit)" : this.Visit(block.Value);
+    }
+
+    protected override string Visit(Expr.If @if)
+    {
+        var res = this.TmpName();
+        var cond = this.Visit(@if.Cond);
+        var elseLabel = this.LabelName();
+        var endLabel = this.LabelName();
+        this.CodeBuilder.AppendLine($"if (!{cond}) goto {elseLabel};");
+        var thenResult = this.Visit(@if.Then);
+        this.CodeBuilder
+            .AppendLine($"goto {endLabel};")
+            .AppendLine($"{elseLabel}:;");
+        var elseResult = @if.Else is null
+            ? "default(Unit)"
+            : this.Visit(@if.Else);
+        this.CodeBuilder
+            .AppendLine($"{endLabel}:;")
+            .AppendLine($"var {res} = {cond} ? {DeVoid(thenResult)} : {DeVoid(elseResult)};");
+        return res;
+    }
+
+    protected override string Visit(Expr.While @while)
+    {
+        var startLabel = this.LabelName();
+        var endLabel = this.LabelName();
+        this.CodeBuilder.AppendLine($"{startLabel}:;");
+        var cond = this.Visit(@while.Cond);        
+        this.CodeBuilder.AppendLine($"if (!{cond}) goto {endLabel};");
+        this.Visit(@while.Body);
+        this.CodeBuilder.AppendLine($"goto {startLabel};");
+        this.CodeBuilder.AppendLine($"{endLabel}:;");
+        return "default(Unit)";
     }
 
     protected override string Visit(Expr.Name name) => name.Symbol!.Kind == SymbolKind.Local
