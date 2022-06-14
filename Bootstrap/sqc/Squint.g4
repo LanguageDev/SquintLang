@@ -4,6 +4,11 @@ grammar Squint;
 
 file : declaration* EOF ;
 
+attribute_list : attribute_sequence* ;
+attribute_sequence : '#' '[' attribute (',' attribute)* ','? ']' ;
+attribute : name ('(' expression_list ')')?
+          | name ('(' type_list ')')?;
+
 declaration : function_declaration
             | variable_declaration
             | import_declaration
@@ -27,7 +32,7 @@ type_declaration : record_type_declaration
 type_declaration_member_list : (type_declaration_member (',' type_declaration_member)* ','?)? ;
 type_declaration_member : ('var' | 'val') name (':' type) ;
 
-record_type_declaration : 'type' name generic_param_list? ('(' type_declaration_member_list ')')?  ';' ;
+record_type_declaration : attribute_list 'type' name generic_param_list? ('(' type_declaration_member_list ')')?  ';' ;
 
 du_type_declaration : 'enum' name generic_param_list? '{' (du_type_ctor (',' du_type_ctor)* ','?)? '}' ;
 du_type_ctor : name '(' type_declaration_member_list ')' ;

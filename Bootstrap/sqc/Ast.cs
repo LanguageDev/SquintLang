@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using Compiler.Syntax;
 
@@ -17,6 +18,24 @@ namespace Squint.Compiler;
 public abstract record class Ast
 {
     public Scope? Scope { get; set; }
+    public ImmutableList<Decl.Attribute> Attributes { get; set; } = ImmutableList<Decl.Attribute>.Empty;
+
+    private static IParseTree ParseParseTree(string text)
+    {
+        var inputStream = new AntlrInputStream(text);
+        var lexer = new SquintLexer(inputStream);
+        var commonTokenStream = new CommonTokenStream(lexer);
+        var parser = new SquintParser(commonTokenStream);
+        return parser.file();
+    }
+
+    public static Ast Parse(string text)
+    {
+        var parseTree = ParseParseTree(text);
+        var ast = AstConverter.ToAst(parseTree);
+        ast = Desugar.Trafo(ast);
+        return ast;
+    }
 }
 
 public abstract record class Stmt : Ast
@@ -28,7 +47,16 @@ public abstract record class Stmt : Ast
 
 public abstract record class Decl : Stmt
 {
+    public interface ITypeDecl
+    {
+        public string Name { get; }
+        public ImmutableList<GenericParam> Generics { get; }
+        public ImmutableList<TypeMember> Members { get; }
+    }
+
     public sealed record class Module(ImmutableList<Decl> Decls) : Decl;
+    public sealed record class Seq(ImmutableList<Decl> Decls) : Decl;
+    public sealed record class Attribute(string Name, ImmutableList<Expr> Args) : Decl;
     public sealed record class Import(
         ImmutableList<string> Parts,
         ImmutableList<GenericParam> Generics) : Decl;
@@ -50,7 +78,7 @@ public abstract record class Decl : Stmt
     public sealed record class Record(
         string Name,
         ImmutableList<GenericParam> Generics,
-        ImmutableList<TypeMember> Members) : Decl
+        ImmutableList<TypeMember> Members) : Decl, ITypeDecl
     {
         public Symbol? Symbol { get; set; }
     }
@@ -101,7 +129,10 @@ public static class AstConverter
         SquintParser.Record_type_declarationContext rec => new Decl.Record(
             rec.name().GetText(),
             ToGenerics(rec.generic_param_list()),
-            rec.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList()),
+            rec.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList())
+            {
+                Attributes = ToAttributeList(rec.attribute_list()),
+            },
         SquintParser.Type_declaration_memberContext mem => new Decl.TypeMember(
             mem.GetChild(0).GetText() == "var",
             mem.name().GetText(),
@@ -180,7 +211,7 @@ public static class AstConverter
     };
 
     private static ImmutableList<Decl.GenericParam> ToGenerics(SquintParser.Generic_param_listContext? l) => l is null
-        ? ImmutableList < Decl.GenericParam >.Empty
+        ? ImmutableList<Decl.GenericParam>.Empty
         : l.name().Select(n => new Decl.GenericParam(n.GetText())).ToImmutableList();
 
     private static Expr ToRelExpr(SquintParser.Relational_expressionContext tree)
@@ -214,6 +245,18 @@ public static class AstConverter
 
         return new Expr.Rel(left, rights.ToImmutable());
     }
+
+    private static ImmutableList<Decl.Attribute> ToAttributeList(SquintParser.Attribute_listContext attrs) => attrs is null
+        ? ImmutableList<Decl.Attribute>.Empty
+        : attrs.attribute_sequence().SelectMany(s => s.attribute()).Select(ToAttribute).ToImmutableList();
+
+    private static Decl.Attribute ToAttribute(SquintParser.AttributeContext attr)
+    {
+        var args = ImmutableList<Expr>.Empty;
+        if (attr.expression_list() is not null) args = attr.expression_list().expression().Select(ToExpr).ToImmutableList();
+        if (attr.type_list() is not null) args = attr.type_list().type().Select(ToType).ToImmutableList();
+        return new(attr.name().GetText(), args);
+    }
 }
 
 public abstract class AstVisitor<TResult>
@@ -240,6 +283,7 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Decl decl) => decl switch
     {
         Decl.Module v => this.Visit(v),
+        Decl.Seq v => this.Visit(v),
         Decl.Import v => this.Visit(v),
         Decl.Record v => this.Visit(v),
         Decl.TypeMember v => this.Visit(v),
@@ -272,6 +316,12 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Decl.Module module)
     {
         this.VisitAll(module.Decls);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Seq seq)
+    {
+        this.VisitAll(seq.Decls);
         return this.Default;
     }
 
@@ -401,5 +451,146 @@ public abstract class AstVisitor<TResult>
     private void VisitOpt(Expr? expr)
     {
         if (expr is not null) this.Visit(expr);
+    }
+}
+
+public abstract class AstTransformer
+{
+    public virtual Ast Transform(Ast ast) => ast switch
+    {
+        Decl v => this.Transform(v),
+        Stmt v => this.Transform(v),
+        Expr v => this.Transform(v),
+        Pattern v => this.Transform(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    public virtual Stmt Transform(Stmt stmt) => stmt switch
+    {
+        Stmt.Exp v => this.Transform(v),
+        Stmt.Block v => this.Transform(v),
+        Stmt.Return v => this.Transform(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    public virtual Decl Transform(Decl decl) => decl switch
+    {
+        Decl.Module v => this.Transform(v),
+        Decl.Import v => this.Transform(v),
+        Decl.Record v => this.Transform(v),
+        Decl.TypeMember v => this.Transform(v),
+        Decl.Impl v => this.Transform(v),
+        Decl.Func v => this.Transform(v),
+        Decl.FuncSignature v => this.Transform(v),
+        Decl.FuncParam v => this.Transform(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    public virtual Expr Transform(Expr expr) => expr switch
+    {
+        Expr.Name v => this.Transform(v),
+        Expr.Call v => this.Transform(v),
+        Expr.Bin v => this.Transform(v),
+        Expr.Rel v => this.Transform(v),
+        Expr.Lit v => this.Transform(v),
+        Expr.MemberAccess v => this.Transform(v),
+        Expr.MemberCall v => this.Transform(v),
+        Expr.This v => this.Transform(v),
+        Expr.Index v => this.Transform(v),
+        _ => throw new NotImplementedException(),
+    };
+
+    public virtual Pattern Transform(Pattern pattern) => pattern switch
+    {
+        _ => throw new NotImplementedException(),
+    };
+
+    public virtual Decl Transform(Decl.Module module) =>
+        new Decl.Module(this.TransformAll(module.Decls));
+
+    public virtual Decl Transform(Decl.Import import) => import;
+
+    public virtual Decl Transform(Decl.Record record) => KeepAttr(record, new Decl.Record(
+        record.Name,
+        this.TransformAll(record.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
+        this.TransformAll(record.Members).Cast<Decl.TypeMember>().ToImmutableList()));
+
+    public virtual Decl Transform(Decl.TypeMember typeMember) =>
+        new Decl.TypeMember(typeMember.Mutable, typeMember.Name, this.Transform(typeMember.Type));
+
+    public virtual Decl Transform(Decl.Impl impl) => new Decl.Impl(
+        this.Transform(impl.Target),
+        this.TransformOpt(impl.Base),
+        this.TransformAll(impl.Decls));
+
+    public virtual Decl Transform(Decl.Func func) => new Decl.Func(
+        (Decl.FuncSignature)this.Transform(func.Signature),
+        this.Transform(func.Body));
+
+    public virtual Decl Transform(Decl.FuncSignature funcSignature) => new Decl.FuncSignature(
+        funcSignature.Name,
+        this.TransformAll(funcSignature.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
+        this.TransformAll(funcSignature.Params).Cast<Decl.FuncParam>().ToImmutableList(),
+        this.TransformOpt(funcSignature.Ret));
+    
+    public virtual Decl Transform(Decl.FuncParam funcParam) =>
+        new Decl.FuncParam(funcParam.Name, this.TransformOpt(funcParam.Type));
+
+    public virtual Stmt Transform(Stmt.Block block) => new Stmt.Block(
+        this.TransformAll(block.Stmts),
+        this.TransformOpt(block.Value));
+
+    public virtual Stmt Transform(Stmt.Return @return) => new Stmt.Return(this.TransformOpt(@return.Value));
+
+    public virtual Stmt Transform(Stmt.Exp exp) => new Stmt.Exp(this.Transform(exp.Expr));
+
+    public virtual Expr Transform(Expr.Name name) => name;
+    public virtual Expr Transform(Expr.Lit lit) => lit;
+    public virtual Expr Transform(Expr.This @this) => @this;
+
+    public virtual Expr Transform(Expr.Call call) => new Expr.Call(
+        this.Transform(call.Called),
+        this.TransformAll(call.Args));
+    
+    public virtual Expr Transform(Expr.Bin bin) => new Expr.Bin(
+        bin.Op,
+        this.Transform(bin.Left),
+        this.Transform(bin.Right));
+
+    public virtual Expr Transform(Expr.Rel rel) => new Expr.Rel(
+        this.Transform(rel.Left),
+        rel.Rights.Select(r => (r.Op, this.Transform(r.Right))).ToImmutableList());
+
+    public virtual Expr Transform(Expr.MemberAccess memberAccess) => new Expr.MemberAccess(
+        this.Transform(memberAccess.Instance),
+        memberAccess.Member);
+
+    public virtual Expr Transform(Expr.MemberCall memberCall) => new Expr.MemberCall(
+        this.Transform(memberCall.Instance),
+        memberCall.Member,
+        this.TransformAll(memberCall.Args));
+
+    public virtual Expr Transform(Expr.Index index) => new Expr.Index(
+        this.Transform(index.Indexed),
+        this.TransformAll(index.Indices));
+
+    private ImmutableList<Stmt> TransformAll(IEnumerable<Stmt> stmts) =>
+        stmts.Select(this.Transform).ToImmutableList();
+
+    private ImmutableList<Decl> TransformAll(IEnumerable<Decl> decls) =>
+        decls.Select(this.Transform).ToImmutableList();
+
+    private ImmutableList<Expr> TransformAll(IEnumerable<Expr> exprs) =>
+        exprs.Select(this.Transform).ToImmutableList();
+
+    private Expr? TransformOpt(Expr? expr) => expr is null
+        ? null
+        : this.Transform(expr);
+
+    private static T KeepAttr<T>(T orig, T trafo)
+        where T : Ast
+    {
+        trafo.Attributes = orig.Attributes;
+        return trafo;
     }
 }

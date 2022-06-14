@@ -269,4 +269,16 @@ public static class Globals
 
     protected override string Visit(Expr.MemberAccess memberAccess) =>
         $"{this.Visit(memberAccess.Instance)}.{memberAccess.Member}";
+
+    protected override string Visit(Expr.MemberCall memberCall)
+    {
+        var instance = this.Visit(memberCall.Instance);
+        var args = memberCall.Args.Select(this.Visit).ToList();
+
+        var res = this.TmpName();
+        var callExpr = $"{instance}.{memberCall.Member}({string.Join(", ", args)})";
+        this.CodeBuilder.AppendLine($"var {res} = {DeVoid(callExpr)};");
+
+        return res;
+    }
 }
