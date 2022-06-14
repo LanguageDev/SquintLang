@@ -13,6 +13,7 @@ namespace Squint.Compiler;
 public enum SymbolKind
 {
     Func,
+    Type,
 }
 
 public sealed record class Symbol(string Name, SymbolKind Kind);
@@ -63,6 +64,11 @@ public static class SymbolResolution
         {
             this.globalScope = MakeScope();
             this.currentScope = this.globalScope;
+
+            void DefineBuiltinType(string name) => this.globalScope.Define(new(name, SymbolKind.Type));
+
+            DefineBuiltinType("string");
+            DefineBuiltinType("int");
         }
 
         private void PushScope() => this.currentScope = MakeScope(this.currentScope);
@@ -111,6 +117,17 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Decl.Record record)
+        {
+            record.Symbol = new(record.Name, SymbolKind.Type);
+            this.currentScope.Define(record.Symbol);
+
+            this.PushScope();
+            base.Visit(record);
+            this.PopScope();
+            return this.Default;
+        }
+
         protected override object Visit(Decl.FuncSignature funcSignature)
         {
             base.Visit(funcSignature);
@@ -124,11 +141,23 @@ public static class SymbolResolution
     private sealed class Pass2 : AstVisitor<object>
     {
         public void Pass(Ast ast) => this.Visit(ast);
+
+        protected override object Visit(Decl.Import import)
+        {
+            // TODO
+            return this.Default;
+        }
     }
 
     // Define order-dependent symbols and resolve all symbols
     private sealed class Pass3 : AstVisitor<object>
     {
         public void Pass(Ast ast) => this.Visit(ast);
+
+        protected override object Visit(Expr.Name name)
+        {
+            name.Symbol = name.Scope!.Reference(name.Value);
+            return this.Default;
+        }
     }
 }

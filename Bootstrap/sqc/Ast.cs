@@ -45,7 +45,10 @@ public abstract record class Decl : Stmt
     public sealed record class Record(
         string Name,
         ImmutableList<GenericParam> Generics,
-        ImmutableList<TypeMember> Members) : Decl;
+        ImmutableList<TypeMember> Members) : Decl
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Impl(
         Expr Target,
         Expr? Base,
@@ -55,7 +58,10 @@ public abstract record class Decl : Stmt
 public abstract record class Expr : Ast
 {
     public sealed record class This : Expr;
-    public sealed record class Name(string Value) : Expr;
+    public sealed record class Name(string Value) : Expr
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Call(Expr Called, ImmutableList<Expr> Args) : Expr;
     public sealed record class Ury(string Op, Expr Subexpr) : Expr;
     public sealed record class Bin(string Op, Expr Left, Expr Right) : Expr;

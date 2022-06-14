@@ -24,5 +24,6 @@ internal class Program
         var ast = AstConverter.ToAst(parseTree);
         SymbolResolution.Resolve(ast);
         var code = Codegen.Generate(ast);
+        Console.WriteLine(code);
     }
 }
