@@ -16,6 +16,7 @@ namespace Squint.Compiler;
 
 public abstract record class Ast
 {
+    public Scope? Scope { get; set; }
 }
 
 public abstract record class Stmt : Ast
@@ -33,7 +34,10 @@ public abstract record class Decl : Stmt
         string Name,
         ImmutableList<GenericParam> Generics,
         ImmutableList<FuncParam> Params,
-        Expr? Ret) : Decl;
+        Expr? Ret) : Decl
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Func(FuncSignature Signature, Stmt Body) : Decl;
     public sealed record class GenericParam(string Name) : Decl;
     public sealed record class FuncParam(string Name, Expr? Type) : Decl;
