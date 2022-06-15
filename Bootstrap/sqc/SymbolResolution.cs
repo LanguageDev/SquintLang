@@ -44,12 +44,15 @@ public sealed record class Scope(
         if (sym.Kind != existing.Kind) throw new InvalidOperationException();
     }
 
-    public Symbol Reference(string name)
+    public Symbol? ReferenceOpt(string name)
     {
         if (this.Symbols.TryGetValue(name, out var existing)) return existing;
-        if (this.Parent is not null) return this.Parent.Reference(name);
-        throw new InvalidOperationException();
+        if (this.Parent is not null) return this.Parent.ReferenceOpt(name);
+        return null;
     }
+
+    public Symbol Reference(string name) =>
+        this.ReferenceOpt(name) ?? throw new InvalidOperationException();
 }
 
 public static class SymbolResolution
@@ -151,6 +154,10 @@ public static class SymbolResolution
             this.PushScope();
             base.Visit(@enum);
             this.PopScope();
+
+            // Propagate up variant symbols with the full name
+            foreach (var v in @enum.Variants) this.currentScope.Define(new(v.Symbol!.FullName, v.Symbol!.Kind));
+
             return this.Default;
         }
 

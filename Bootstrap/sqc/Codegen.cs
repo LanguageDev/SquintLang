@@ -429,7 +429,9 @@ public static class Globals
 
         // Find out if this is really a ctor call
         var predictedTypeName = $"{instance}.{memberCall.Member}";
-        var isCtor = AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetType(predictedTypeName) is not null);
+        // Either native type or a compound type name
+        var isCtor = AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetType(predictedTypeName) is not null)
+                  || memberCall.Scope!.ReferenceOpt(predictedTypeName) is not null;
 
         var args = memberCall.Args.Select(this.Visit).ToList();
 
