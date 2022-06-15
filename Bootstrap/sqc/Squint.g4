@@ -130,15 +130,15 @@ while_statement  : 'while' condition=expression 'do' body=statement ;
 for_expression : 'for' iterator=name 'in' iterable=expression 'do' body=expression ;
 for_statement  : 'for' iterator=name 'in' iterable=expression 'do' body=statement ;
 
-match_expression : 'match' expression 'with' '{' (match_expression_arm (',' match_expression_arm)* ','?)? '}' ;
+match_expression : 'match' expression 'with' ('|'? match_expression_arm ('|' match_expression_arm)*)? ;
 match_expression_arm : pattern '->' expression ;
 
-match_statement : 'match' expression 'with' '{' (match_statement_arm (',' match_statement_arm)* ','?)? '}' ;
+match_statement : 'match' expression 'with' ('|'? match_statement_arm ('|' match_statement_arm)*)? ;
 match_statement_arm : pattern '->' statement ;
 
-pattern : '_'                       # discard_pattern
-        | name                      # name_pattern
-        | name '(' pattern_list ')' # destructure_pattern
+pattern : '_'                                   # discard_pattern
+        | name                                  # name_pattern
+        | name ('.' name)* '(' pattern_list ')' # destructure_pattern
         ;
 pattern_list : (pattern (',' pattern)* ','?)? ;
 

@@ -116,10 +116,14 @@ public abstract record class Expr : Ast
     public sealed record class MemberAccess(Expr Instance, string Member) : Expr;
     public sealed record class MemberCall(Expr Instance, string Member, ImmutableList<Expr> Args) : Expr;
     public sealed record class Index(Expr Indexed, ImmutableList<Expr> Indices) : Expr;
+    public sealed record class Match(Expr Value, ImmutableList<MatchArm> Arms) : Expr;
+    public sealed record class MatchArm(Pattern Pattern, Expr Value) : Expr;
 }
 
 public abstract record class Pattern : Ast
 {
+    public sealed record class Name(string Value) : Pattern;
+    public sealed record class Destructure(string Name_, ImmutableList<Pattern> Args) : Pattern;
 }
 
 public static class AstConverter
@@ -215,6 +219,9 @@ public static class AstConverter
         SquintParser.While_statementContext w => new Stmt.Exp(new Expr.While(
             ToExpr(w.condition),
             StmtToExpr(w.body))),
+        SquintParser.Match_statementContext m => new Stmt.Exp(new Expr.Match(
+            ToExpr(m.expression()),
+            m.match_statement_arm().Select(ToExpr).Cast<Expr.MatchArm>().ToImmutableList())),
         _ => throw new NotImplementedException(),
     };
 
@@ -260,6 +267,15 @@ public static class AstConverter
             asgn.op.GetText(),
             ToExpr(asgn.left),
             ToExpr(asgn.right)),
+        SquintParser.Match_expressionContext m => new Expr.Match(
+            ToExpr(m.expression()),
+            m.match_expression_arm().Select(ToExpr).Cast<Expr.MatchArm>().ToImmutableList()),
+        SquintParser.Match_expression_armContext a => new Expr.MatchArm(
+            ToPattern(a.pattern()),
+            ToExpr(a.expression())),
+        SquintParser.Match_statement_armContext a => new Expr.MatchArm(
+            ToPattern(a.pattern()),
+            new Expr.Block(ImmutableList.Create(ToStmt(a.statement())), null)),
         _ => throw new NotImplementedException(),
     };
 
@@ -272,6 +288,15 @@ public static class AstConverter
         SquintParser.Nested_typeContext n => new Expr.MemberAccess(
             ToType(n.type()),
             n.name().GetText()),
+        _ => throw new NotImplementedException(),
+    };
+
+    private static Pattern ToPattern(IParseTree tree) => tree switch
+    {
+        SquintParser.Name_patternContext n => new Pattern.Name(n.name().GetText()),
+        SquintParser.Destructure_patternContext d => new Pattern.Destructure(
+            string.Join('.', d.name().Select(n => n.GetText())),
+            d.pattern_list().pattern().Select(ToPattern).ToImmutableList()),
         _ => throw new NotImplementedException(),
     };
 
@@ -390,11 +415,15 @@ public abstract class AstVisitor<TResult>
         Expr.Index v => this.Visit(v),
         Expr.If v => this.Visit(v),
         Expr.While v => this.Visit(v),
+        Expr.Match v => this.Visit(v),
+        Expr.MatchArm v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
     protected virtual TResult Visit(Pattern pattern) => pattern switch
     {
+        Pattern.Name v => this.Visit(v),
+        Pattern.Destructure v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -553,6 +582,28 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
+    protected virtual TResult Visit(Expr.Match match)
+    {
+        this.Visit(match.Value);
+        this.VisitAll(match.Arms);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.MatchArm matchArm)
+    {
+        this.Visit(matchArm.Pattern);
+        this.Visit(matchArm.Value);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Pattern.Name name) => this.Default;
+
+    protected virtual TResult Visit(Pattern.Destructure destructure)
+    {
+        this.VisitAll(destructure.Args);
+        return this.Default;
+    }
+
     private void VisitAll(IEnumerable<Stmt> stmts)
     {
         foreach (var d in stmts) this.Visit(d);
@@ -566,6 +617,11 @@ public abstract class AstVisitor<TResult>
     private void VisitAll(IEnumerable<Expr> exprs)
     {
         foreach (var d in exprs) this.Visit(d);
+    }
+
+    private void VisitAll(IEnumerable<Pattern> pats)
+    {
+        foreach (var d in pats) this.Visit(d);
     }
 
     private void VisitOpt(Expr? expr)
@@ -623,11 +679,15 @@ public abstract class AstTransformer
         Expr.Index v => this.Transform(v),
         Expr.If v => this.Transform(v),
         Expr.While v => this.Transform(v),
+        Expr.Match v => this.Transform(v),
+        Expr.MatchArm v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
     public virtual Pattern Transform(Pattern pattern) => pattern switch
     {
+        Pattern.Name v => this.Transform(v),
+        Pattern.Destructure v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -728,6 +788,20 @@ public abstract class AstTransformer
         this.Transform(@while.Cond),
         this.Transform(@while.Body));
 
+    public virtual Expr Transform(Expr.Match match) => new Expr.Match(
+        this.Transform(match.Value),
+        this.TransformAll(match.Arms).Cast<Expr.MatchArm>().ToImmutableList());
+
+    public virtual Expr Transform(Expr.MatchArm matchArm) => new Expr.MatchArm(
+        this.Transform(matchArm.Pattern),
+        this.Transform(matchArm.Value));
+
+    public virtual Pattern Transform(Pattern.Name name) => name;
+
+    public virtual Pattern Transform(Pattern.Destructure destructure) => new Pattern.Destructure(
+        destructure.Name_,
+        this.TransformAll(destructure.Args));
+
     private ImmutableList<Stmt> TransformAll(IEnumerable<Stmt> stmts) =>
         stmts.Select(this.Transform).ToImmutableList();
 
@@ -736,6 +810,9 @@ public abstract class AstTransformer
 
     private ImmutableList<Expr> TransformAll(IEnumerable<Expr> exprs) =>
         exprs.Select(this.Transform).ToImmutableList();
+
+    private ImmutableList<Pattern> TransformAll(IEnumerable<Pattern> pats) =>
+        pats.Select(this.Transform).ToImmutableList();
 
     private Expr? TransformOpt(Expr? expr) => expr is null
         ? null
