@@ -106,6 +106,7 @@ type : type generic_arg_list                               # generic_type
      | '[' ']' element_type=type                           # array_type
      | '(' param_types=type_list ')' '->' return_type=type # func_type
      | '(' type ')'                                        # grouping_type
+     | type '.' name                                       # nested_type
      | name                                                # name_type
      ;
 

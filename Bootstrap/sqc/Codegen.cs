@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -125,6 +126,7 @@ public static class Globals
     {
         Expr.Name name => name.Symbol!.FullName,
         Expr.Index index => $"{this.GetTypeString(index.Indexed)}<{string.Join(", ", index.Indices.Select(GetTypeString))}>",
+        Expr.MemberAccess maccess => $"{this.GetTypeString(maccess.Instance)}.{maccess.Member}",
         _ => throw new NotImplementedException(),
     };
 
@@ -424,11 +426,24 @@ public static class Globals
     protected override string Visit(Expr.MemberCall memberCall)
     {
         var instance = this.Visit(memberCall.Instance);
+
+        // Find out if this is really a ctor call
+        var predictedTypeName = $"{instance}.{memberCall.Member}";
+        var isCtor = AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetType(predictedTypeName) is not null);
+
         var args = memberCall.Args.Select(this.Visit).ToList();
 
         var res = this.TmpName();
         var callExpr = $"{instance}.{memberCall.Member}({string.Join(", ", args)})";
-        this.CodeBuilder.AppendLine($"var {res} = {DeVoid(callExpr)};");
+
+        if (isCtor)
+        {
+            this.CodeBuilder.AppendLine($"var {res} = new {callExpr};");
+        }
+        else
+        {
+            this.CodeBuilder.AppendLine($"var {res} = {DeVoid(callExpr)};");
+        }
 
         return res;
     }

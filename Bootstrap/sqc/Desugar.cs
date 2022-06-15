@@ -32,25 +32,22 @@ public sealed class Desugar : AstTransformer
 
     private static Decl ImplementDerive(Decl.Record target, Expr der) => der switch
     {
-        // TODO: Remove namespace injections
-
-        // TODO: Hash
+        // TODO: Hash and object equality?
         Expr.Name name when name.Value == "Equatable" => (Decl)Ast.Parse($@"
-import System.IEquatable[T];
-
-impl IEquatable[{target.Name}] for {target.Name} {{
+impl {target.Name} {{
+    // TODO
+}}
+impl System.IEquatable[{target.Name}] for {target.Name} {{
     func Equals(this, other: {target.Name}): bool =
         {string.Join(" and ", target.Members.Select(m => $"this.{m.Name}.Equals(other.{m.Name})"))};
 }}
 "),
 
         Expr.Name name when name.Value == "ToString" => (Decl)Ast.Parse($@"
-import System.Text.StringBuilder;
-
 impl {target.Name} {{
     #[override]
     func ToString(this): string {{
-        var sb = StringBuilder();
+        var sb = System.Text.StringBuilder();
         sb.Append(""{target.Name}("");
         {string.Join("sb.Append(\", \");", target.Members.Select(m => $"sb.Append(this.{m.Name}.ToString());"))}
         sb.Append("")"");

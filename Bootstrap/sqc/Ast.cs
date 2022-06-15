@@ -269,6 +269,9 @@ public static class AstConverter
         SquintParser.Generic_typeContext genType => new Expr.Index(
             ToType(genType.type()),
             genType.generic_arg_list().type().Select(ToType).ToImmutableList()),
+        SquintParser.Nested_typeContext n => new Expr.MemberAccess(
+            ToType(n.type()),
+            n.name().GetText()),
         _ => throw new NotImplementedException(),
     };
 

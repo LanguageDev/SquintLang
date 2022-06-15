@@ -18,6 +18,7 @@ public enum SymbolKind
     Type,
     Local,
     Global,
+    Namespace,
 }
 
 public sealed record class Symbol(string Name, SymbolKind Kind)
@@ -83,6 +84,9 @@ public static class SymbolResolution
             DefineBuiltinType("int");
             DefineBuiltinType("bool");
             DefineBuiltinType("unit", "void");
+
+            // HACK: We register some namespaces
+            this.globalScope.Define(new("System", SymbolKind.Namespace));
         }
 
         private void PushScope() => this.currentScope = MakeScope(this.currentScope);
