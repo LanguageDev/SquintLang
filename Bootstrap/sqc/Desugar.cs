@@ -13,43 +13,73 @@ namespace Squint.Compiler;
 
 public sealed class Desugar : AstTransformer
 {
+    private readonly record struct DeriveInfo(string TypeName, IEnumerable<string> MemberNames);
+
     public static Ast Trafo(Ast ast) => new Desugar().Transform(ast);
+
+    private readonly Stack<Decl.Enum> enumStack = new();
 
     public override Decl Transform(Decl.Record record)
     {
         record = (Decl.Record)base.Transform(record);
-        var result = record as Decl;
+        
+        var derInfo = new DeriveInfo(record.Name, record.Members.Select(m => m.Name));
+        return ApplyDerives(record, derInfo);
+    }
 
-        // Go through each derive argument
-        foreach (var derive in record.Attributes.Where(attr => attr.Name == "derive").SelectMany(d => d.Args))
-        {
-            var impl = ImplementDerive(record, derive);
-            result = new Decl.Seq(ImmutableList.Create(result, impl));
-        }
-
+    public override Decl Transform(Decl.Enum @enum)
+    {
+        this.enumStack.Push(@enum);
+        var result = base.Transform(@enum);
+        this.enumStack.Pop();
         return result;
     }
 
-    private static Decl ImplementDerive(Decl.Record target, Expr der) => der switch
+    public override Decl Transform(Decl.EnumVariant enumVariant)
     {
-        // TODO: Hash and object equality?
+        enumVariant = (Decl.EnumVariant)base.Transform(enumVariant);
+        var parent = this.enumStack.Peek();
+
+        // Go through each derive argument
+        var fullName = $"{parent.Name}.{enumVariant.Name}";
+        var derInfo = new DeriveInfo(fullName, enumVariant.Members.Select(m => m.Name));
+        return ApplyDerives(enumVariant, derInfo);
+    }
+
+    private static Decl ApplyDerives(Decl decl, DeriveInfo deriveInfo)
+    {
+        // Go through each derive argument
+        foreach (var derive in GetDeriveArgs(decl))
+        {
+            var impl = ImplementDerive(deriveInfo, derive);
+            decl = new Decl.Seq(ImmutableList.Create(decl, impl));
+        }
+        return decl;
+    }
+
+    private static IEnumerable<Expr> GetDeriveArgs(Decl decl) =>
+        decl.Attributes.Where(attr => attr.Name == "derive").SelectMany(d => d.Args);
+
+    private static Decl ImplementDerive(DeriveInfo target, Expr der) => der switch
+    {
+        // TODO: Hash and object equality? (we need casting for equality)
         Expr.Name name when name.Value == "Equatable" => (Decl)Ast.Parse($@"
-impl {target.Name} {{
+impl {target.TypeName} {{
     // TODO
 }}
-impl System.IEquatable[{target.Name}] for {target.Name} {{
-    func Equals(this, other: {target.Name}): bool =
-        {string.Join(" and ", target.Members.Select(m => $"this.{m.Name}.Equals(other.{m.Name})"))};
+impl System.IEquatable[{target.TypeName}] for {target.TypeName} {{
+    func Equals(this, other: {target.TypeName}): bool =
+        {string.Join(" and ", target.MemberNames.Select(m => $"this.{m}.Equals(other.{m})"))};
 }}
 "),
 
         Expr.Name name when name.Value == "ToString" => (Decl)Ast.Parse($@"
-impl {target.Name} {{
+impl {target.TypeName} {{
     #[override]
     func ToString(this): string {{
         var sb = System.Text.StringBuilder();
-        sb.Append(""{target.Name}("");
-        {string.Join("sb.Append(\", \");", target.Members.Select(m => $"sb.Append(this.{m.Name}.ToString());"))}
+        sb.Append(""{target.TypeName}("");
+        {string.Join("sb.Append(\", \");", target.MemberNames.Select(m => $"sb.Append(this.{m}.ToString());"))}
         sb.Append("")"");
         return sb.ToString();
     }}

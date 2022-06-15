@@ -146,13 +146,13 @@ public static class AstConverter
             {
                 Attributes = ToAttributeList(rec.attribute_list()),
             },
-        SquintParser.Du_type_declarationContext du => new Decl.Enum(
+        SquintParser.Du_type_declarationContext du => ConnectVariants(new Decl.Enum(
             du.name().GetText(),
             ToGenerics(du.generic_param_list()),
             du.du_type_ctor().Select(ToDecl).Cast<Decl.EnumVariant>().ToImmutableList())
             {
                 Attributes = ToAttributeList(du.attribute_list()),
-            },
+            }),
         SquintParser.Du_type_ctorContext ctor => new Decl.EnumVariant(
             ctor.name().GetText(),
             ctor.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList())
@@ -329,6 +329,12 @@ public static class AstConverter
 
         var stmt = ToStmt(tree);
         return new Expr.Block(ImmutableList.Create(stmt), null);
+    }
+
+    private static Decl ConnectVariants(Decl.Enum @enum)
+    {
+        foreach (var v in @enum.Variants) v.Parent = @enum;
+        return @enum;
     }
 }
 
@@ -635,10 +641,17 @@ public abstract class AstTransformer
         this.TransformAll(record.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
         this.TransformAll(record.Members).Cast<Decl.TypeMember>().ToImmutableList()));
 
-    public virtual Decl Transform(Decl.Enum @enum) => KeepAttr(@enum, new Decl.Enum(
-        @enum.Name,
-        this.TransformAll(@enum.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
-        this.TransformAll(@enum.Variants).Cast<Decl.EnumVariant>().ToImmutableList()));
+    public virtual Decl Transform(Decl.Enum @enum)
+    {
+        // The variants need to propagate decl sequences
+        var (variants, others) = FilterSeq<Decl.EnumVariant>(this.TransformAll(@enum.Variants));
+        var newSeq = KeepAttr(@enum, new Decl.Enum(
+            @enum.Name,
+            this.TransformAll(@enum.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
+            variants));
+        foreach (var v in variants) v.Parent = newSeq;
+        return new Decl.Seq(others.Append(newSeq).ToImmutableList());
+    }
 
     public virtual Decl Transform(Decl.EnumVariant enumVariant) => KeepAttr(enumVariant, new Decl.EnumVariant(
         enumVariant.Name,
@@ -733,5 +746,39 @@ public abstract class AstTransformer
     {
         trafo.Attributes = orig.Attributes;
         return trafo;
+    }
+
+    private static (ImmutableList<T> Targets, ImmutableList<Decl> Others) FilterSeq<T>(IEnumerable<Decl> decls)
+        where T : Decl => decls
+        .Select(FilterSeq<T>)
+        .Aggregate((left, right) => (
+            left.Targets.Concat(right.Targets).ToImmutableList(),
+            left.Others.Concat(right.Others).ToImmutableList()));
+
+    private static (ImmutableList<T> Targets, ImmutableList<Decl> Others) FilterSeq<T>(Decl decl)
+        where T : Decl
+    {
+        var targets = ImmutableList.CreateBuilder<T>();
+        var others = ImmutableList.CreateBuilder<Decl>();
+
+        void Iterate(Decl d)
+        {
+            if (d is Decl.Seq s)
+            {
+                foreach (var i in s.Decls) Iterate(i);
+            }
+            else if (d is T t)
+            {
+                targets!.Add(t);
+            }
+            else
+            {
+                others!.Add(d);
+            }
+        }
+
+        Iterate(decl);
+
+        return (targets.ToImmutable(), others.ToImmutable());
     }
 }

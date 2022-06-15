@@ -200,7 +200,7 @@ public static class Globals
         var typeSymbol = impl.Target switch
         {
             Expr.Name n => n.Symbol!,
-            _ => throw new NotImplementedException(),
+            _ => impl.Scope!.ReferenceOpt(this.GetTypeString(impl.Target)) ?? throw new NotImplementedException(),
         };
 
         var typeBuilder = this.GetTypeBuilder(typeSymbol);

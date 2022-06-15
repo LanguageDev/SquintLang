@@ -33,11 +33,11 @@ public sealed record class Scope(
 {
     public bool IsGlobal => this.Parent is null;
 
-    public void Define(Symbol sym)
+    public void Define(Symbol sym, string? nameOverride = null)
     {
-        if (!this.Symbols.TryGetValue(sym.Name, out var existing))
+        if (!this.Symbols.TryGetValue(nameOverride ?? sym.Name, out var existing))
         {
-            this.Symbols.Add(sym.Name, sym);
+            this.Symbols.Add(nameOverride ?? sym.Name, sym);
             return;
         }
 
@@ -149,14 +149,12 @@ public static class SymbolResolution
             @enum.Symbol = new(@enum.Name, SymbolKind.Type);
             this.currentScope.Define(@enum.Symbol);
 
-            foreach (var v in @enum.Variants) v.Parent = @enum;
-
             this.PushScope();
             base.Visit(@enum);
             this.PopScope();
 
             // Propagate up variant symbols with the full name
-            foreach (var v in @enum.Variants) this.currentScope.Define(new(v.Symbol!.FullName, v.Symbol!.Kind));
+            foreach (var v in @enum.Variants) this.currentScope.Define(v.Symbol!, v.Symbol!.FullName);
 
             return this.Default;
         }
