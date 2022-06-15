@@ -149,10 +149,16 @@ public static class AstConverter
         SquintParser.Du_type_declarationContext du => new Decl.Enum(
             du.name().GetText(),
             ToGenerics(du.generic_param_list()),
-            du.du_type_ctor().Select(ToDecl).Cast<Decl.EnumVariant>().ToImmutableList()),
+            du.du_type_ctor().Select(ToDecl).Cast<Decl.EnumVariant>().ToImmutableList())
+            {
+                Attributes = ToAttributeList(du.attribute_list()),
+            },
         SquintParser.Du_type_ctorContext ctor => new Decl.EnumVariant(
             ctor.name().GetText(),
-            ctor.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList()),
+            ctor.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList())
+            {
+                Attributes = ToAttributeList(ctor.attribute_list()),
+            },
         SquintParser.Type_declaration_memberContext mem => new Decl.TypeMember(
             mem.GetChild(0).GetText() == "var",
             mem.name().GetText(),
