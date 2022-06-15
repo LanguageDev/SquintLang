@@ -30,6 +30,11 @@ public sealed class Desugar : AstTransformer
     public override Decl Transform(Decl.Enum @enum)
     {
         this.enumStack.Push(@enum);
+        // We attach each derive to the children
+        var derives = GetDeriveArgs(@enum)
+            .Select(a => new Decl.Attribute("derive", ImmutableList.Create(a)))
+            .ToImmutableList();
+        foreach (var v in @enum.Variants) v.Attributes = v.Attributes.Concat(derives).ToImmutableList();
         var result = base.Transform(@enum);
         this.enumStack.Pop();
         return result;
