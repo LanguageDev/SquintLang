@@ -136,6 +136,33 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Decl.Enum @enum)
+        {
+            @enum.Symbol = new(@enum.Name, SymbolKind.Type);
+            this.currentScope.Define(@enum.Symbol);
+
+            foreach (var v in @enum.Variants) v.Parent = @enum;
+
+            this.PushScope();
+            base.Visit(@enum);
+            this.PopScope();
+            return this.Default;
+        }
+
+        protected override object Visit(Decl.EnumVariant enumVariant)
+        {
+            enumVariant.Symbol = new(enumVariant.Name, SymbolKind.Type)
+            {
+                FullName = $"{enumVariant.Parent!.Symbol!.FullName}.{enumVariant.Name}",
+            };
+            this.currentScope.Define(enumVariant.Symbol);
+
+            this.PushScope();
+            base.Visit(enumVariant);
+            this.PopScope();
+            return this.Default;
+        }
+
         protected override object Visit(Decl.FuncSignature funcSignature)
         {
             base.Visit(funcSignature);
