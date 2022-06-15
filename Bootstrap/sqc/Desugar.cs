@@ -32,6 +32,7 @@ public sealed class Desugar : AstTransformer
 
     private static Decl ImplementDerive(Decl.Record target, Expr der) => der switch
     {
+        // TODO: Hash
         Expr.Name name when name.Value == "Equatable" => (Decl)Ast.Parse($@"
 import System.IEquatable[T];
 
@@ -40,6 +41,7 @@ impl IEquatable[{target.Name}] for {target.Name} {{
         {string.Join(" and ", target.Members.Select(m => $"this.{m.Name}.Equals(other.{m.Name})"))};
 }}
 "),
+
         Expr.Name name when name.Value == "ToString" => (Decl)Ast.Parse($@"
 import System.Text.StringBuilder;
 

@@ -23,6 +23,7 @@ public enum SymbolKind
 public sealed record class Symbol(string Name, SymbolKind Kind)
 {
     public string FullName { get; init; } = Name;
+    public Symbol? Supertype { get; set; }
 }
 
 public sealed record class Scope(
@@ -154,6 +155,7 @@ public static class SymbolResolution
             enumVariant.Symbol = new(enumVariant.Name, SymbolKind.Type)
             {
                 FullName = $"{enumVariant.Parent!.Symbol!.FullName}.{enumVariant.Name}",
+                Supertype = enumVariant.Parent!.Symbol,
             };
             this.currentScope.Define(enumVariant.Symbol);
 

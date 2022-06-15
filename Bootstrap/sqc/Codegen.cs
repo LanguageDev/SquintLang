@@ -27,10 +27,12 @@ public sealed class Codegen : AstVisitor<string>
     public sealed class TypeBuilder
     {
         public string Kind { get; set; } = "class";
+        public bool Abstract { get; set; } = false;
         public bool Open { get; set; } = false;
         public string Name { get; set; } = "Unnamed";
         public HashSet<string> Bases { get; set; } = new();
         public StringBuilder CodeBuilder { get; set; } = new();
+        public Dictionary<Symbol, TypeBuilder> SubtypeBuilders { get; set; } = new();
 
         public string Code
         {
@@ -38,12 +40,14 @@ public sealed class Codegen : AstVisitor<string>
             {
                 var result = new StringBuilder();
                 result.Append("public ");
-                if (!this.Open) result.Append("sealed ");
+                if (this.Abstract) result.Append("abstract ");
+                if (!this.Open && !this.Abstract) result.Append("sealed ");
                 result.Append(this.Kind).Append(' ');
                 result.Append(this.Name);
                 if (this.Bases.Count > 0) result.Append(" : ").AppendJoin(", ", this.Bases);
                 result.AppendLine();
                 result.AppendLine("{");
+                foreach (var sub in this.SubtypeBuilders.Values) result.AppendLine(sub.Code);
                 result.AppendLine(this.CodeBuilder.ToString().TrimEnd());
                 result.AppendLine("}");
                 return result.ToString();
@@ -103,13 +107,16 @@ public static class Globals
 
     private TypeBuilder GetTypeBuilder(Symbol symbol)
     {
-        if (!this.types.TryGetValue(symbol, out var builder))
+        var builderMap = symbol.Supertype is null
+            ? this.types
+            : this.GetTypeBuilder(symbol.Supertype).SubtypeBuilders;
+        if (!builderMap.TryGetValue(symbol, out var builder))
         {
             builder = new()
             {
                 Name = symbol.Name,
             };
-            this.types.Add(symbol, builder);
+            builderMap.Add(symbol, builder);
         }
         return builder;
     }
@@ -142,6 +149,45 @@ public static class Globals
             .AppendLine(")")
             .AppendLine("{");
         foreach (var m in record.Members) builder.CodeBuilder.AppendLine($"this.{m.Name} = {m.Name};");
+        builder.CodeBuilder.AppendLine("}");
+
+        return this.Default;
+    }
+
+    protected override string Visit(Decl.Enum @enum)
+    {
+        var builder = this.GetTypeBuilder(@enum.Symbol!);
+        builder.Abstract = true;
+
+        // Subtypes
+        foreach (var v in @enum.Variants) this.Visit(v);
+
+        return this.Default;
+    }
+
+    protected override string Visit(Decl.EnumVariant enumVariant)
+    {
+        var baseBuilder = this.GetTypeBuilder(enumVariant.Symbol!.Supertype!);
+        var builder = this.GetTypeBuilder(enumVariant.Symbol!);
+
+        // Base type
+        builder.Bases.Add(baseBuilder.Name);
+
+        // Properties
+        foreach (var m in enumVariant.Members)
+        {
+            var ty = this.GetTypeString(m.Type);
+            var getSet = m.Mutable ? "get; set;" : "get; init;";
+            builder.CodeBuilder.AppendLine($"public {ty} {m.Name} {{ {getSet} }}");
+        }
+
+        // Ctor
+        builder.CodeBuilder
+            .Append($"public {enumVariant.Name}(")
+            .AppendJoin(", ", enumVariant.Members.Select(m => $"{this.GetTypeString(m.Type)} {m.Name}"))
+            .AppendLine(")")
+            .AppendLine("{");
+        foreach (var m in enumVariant.Members) builder.CodeBuilder.AppendLine($"this.{m.Name} = {m.Name};");
         builder.CodeBuilder.AppendLine("}");
 
         return this.Default;
