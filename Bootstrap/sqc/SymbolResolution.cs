@@ -23,6 +23,7 @@ public enum SymbolKind
 
 public sealed record class Symbol(string Name, SymbolKind Kind)
 {
+    public object UniqueKey { get; set; } = new();
     public string FullName { get; init; } = Name;
     public Symbol? Supertype { get; set; }
 }
@@ -326,6 +327,13 @@ public static class SymbolResolution
             // Define local
             name.Symbol = new(name.Value, SymbolKind.Local);
             name.Scope!.Define(name.Symbol);
+            return this.Default;
+        }
+
+        protected override object Visit(Pattern.Destructure destructure)
+        {
+            base.Visit(destructure);
+            destructure.NameSymbol = destructure.Scope!.Reference(destructure.Name_);
             return this.Default;
         }
     }

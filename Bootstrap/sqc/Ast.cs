@@ -126,7 +126,10 @@ public abstract record class Pattern : Ast
     {
         public Symbol? Symbol { get; set; }
     }
-    public sealed record class Destructure(string Name_, ImmutableList<Pattern> Args) : Pattern;
+    public sealed record class Destructure(string Name_, ImmutableList<Pattern> Args) : Pattern
+    {
+        public Symbol? NameSymbol { get; set; }
+    }
 }
 
 public static class AstConverter

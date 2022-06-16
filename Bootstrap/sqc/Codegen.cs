@@ -74,13 +74,16 @@ public sealed class Codegen : AstVisitor<string>
                 result.AppendLine("}");
 
                 // Deconstruction
+                // NOTE: For easier codegen destructure returns true
                 result
-                    .Append("public void Deconstruct(")
+                    .Append("public bool Deconstruct(")
                     .AppendJoin(", ", this.Properties.Select(m => $"out {m.Type} {m.Name}"))
                     .AppendLine(")")
                     .AppendLine("{");
                 foreach (var m in this.Properties) result.AppendLine($"{m.Name} = this.{m.Name};");
-                result.AppendLine("}");
+                result
+                    .AppendLine("return true;")
+                    .AppendLine("}");
 
                 // Custom code
                 result.AppendLine(this.CodeBuilder.ToString().TrimEnd());
@@ -106,6 +109,11 @@ public static class Prelude
     {{
         f();
         return default(Unit);
+    }}
+    public static bool CopyOut<T>(T a, out T b)
+    {{
+        b = a;
+        return true;
     }}
 }}
 
@@ -165,6 +173,33 @@ public static class Globals
         Expr.MemberAccess maccess => $"{this.GetTypeString(maccess.Instance)}.{maccess.Member}",
         _ => throw new NotImplementedException(),
     };
+
+    private string TranslatePattern(Pattern p, string parent)
+    {
+        switch (p)
+        {
+        case Pattern.Destructure d:
+        {
+            var ty = d.NameSymbol!.FullName;
+            var boundName = this.TmpName();
+            var boundArgs = d.Args
+                .Select(a => (Pattern: a, Name: this.TmpName()))
+                .ToList();
+            var outArgs = string.Join(", ", boundArgs.Select(b => $"out var {b.Name}"));
+            var remPattern = string.Join("", boundArgs.Select(a => $" && {this.TranslatePattern(a.Pattern, a.Name)}"));
+            return $"({parent} is {ty} {boundName} && {boundName}.Deconstruct({outArgs}){remPattern})";
+        }
+
+        case Pattern.Name n:
+        {
+            var targetName = this.GetLocalName(n.Symbol!);
+            return $"Prelude.CopyOut({parent}, out var {targetName})";
+        }
+
+        default:
+            throw new NotImplementedException();
+        }
+    }
 
     private static string DeVoid(string expr) => $"Prelude.DeVoid(() => {expr})";
 
@@ -324,6 +359,56 @@ public static class Globals
         this.CodeBuilder.AppendLine($"goto {startLabel};");
         this.CodeBuilder.AppendLine($"{endLabel}:;");
         return "default(Unit)";
+    }
+
+    protected override string Visit(Expr.Match match)
+    {
+        var res = this.TmpName();
+        var valueRes = this.Visit(match.Value);
+
+        var choiceVar = this.TmpName();
+        var armLabels = match.Arms
+            .Select(_ => this.LabelName())
+            .Append(this.LabelName())
+            .ToList();
+        var endLabel = this.LabelName();
+        var armResults = new List<string>();
+        this.CodeBuilder.AppendLine($"var {choiceVar} = -1;");
+
+        for (var i = 0; i < match.Arms.Count; ++i)
+        {
+            this.CodeBuilder.AppendLine($"{armLabels[i]}:");
+            // If there was a prev. arm, set its result to default here to avoid compile error
+            if (i > 0) this.CodeBuilder.AppendLine($"{armResults[i - 1]} = default;");
+            var arm = match.Arms[i];
+            var patternMatcher = this.TranslatePattern(arm.Pattern, valueRes);
+            // If the pattern does not match, go to the next label
+            this.CodeBuilder.AppendLine($"if (!{patternMatcher}) goto {armLabels[i + 1]};");
+            // Otherwise do the thing in this arm
+            // Also save that this was the choice that ran
+            this.CodeBuilder.AppendLine($"{choiceVar} = {i};");
+            armResults.Add(this.Visit(arm.Value));
+            // Jump to the end
+            this.CodeBuilder.AppendLine($"goto {endLabel};");
+        }
+
+        // Default label, we just throw
+        this.CodeBuilder
+            .AppendLine($"{armLabels[^1]}:")
+            .AppendLine("throw new System.InvalidOperationException(\"Unhandled match case!\");");
+
+        // End label where we assign value
+        this.CodeBuilder
+            .AppendLine($"{endLabel}:")
+            .AppendLine($"var {res} = {choiceVar} switch")
+            .AppendLine("{");
+        for (var i = 0; i < match.Arms.Count; ++i) this.CodeBuilder.AppendLine($"{i} => {armResults[i]},");
+        // Default and end
+        this.CodeBuilder
+            .AppendLine("_ => throw new System.InvalidOperationException(\"Unhandled match case!\"),")
+            .AppendLine("};");
+
+        return res;
     }
 
     protected override string Visit(Expr.Name name) => name.Symbol!.Kind == SymbolKind.Local
