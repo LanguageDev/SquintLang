@@ -27,12 +27,15 @@ public sealed class Codegen : AstVisitor<string>
 
     public sealed class TypeBuilder
     {
+        public readonly record struct PropInfo(string Type, string Name, bool Mutable);
+
         public string Kind { get; set; } = "class";
         public bool Abstract { get; set; } = false;
         public bool Open { get; set; } = false;
         public string Name { get; set; } = "Unnamed";
         public HashSet<string> Bases { get; set; } = new();
         public StringBuilder CodeBuilder { get; set; } = new();
+        public List<PropInfo> Properties { get; set; } = new();
         public Dictionary<Symbol, TypeBuilder> SubtypeBuilders { get; set; } = new();
 
         public string Code
@@ -40,6 +43,8 @@ public sealed class Codegen : AstVisitor<string>
             get
             {
                 var result = new StringBuilder();
+
+                // Header
                 result.Append("public ");
                 if (this.Abstract) result.Append("abstract ");
                 if (!this.Open && !this.Abstract) result.Append("sealed ");
@@ -48,8 +53,39 @@ public sealed class Codegen : AstVisitor<string>
                 if (this.Bases.Count > 0) result.Append(" : ").AppendJoin(", ", this.Bases);
                 result.AppendLine();
                 result.AppendLine("{");
+
+                // Subtypes
                 foreach (var sub in this.SubtypeBuilders.Values) result.AppendLine(sub.Code);
+
+                // Properties
+                foreach (var (ty, name, mut) in this.Properties)
+                {
+                    var getSet = mut ? "get; set;" : "get; init;";
+                    result.AppendLine($"public {ty} {name} {{ {getSet} }}");
+                }
+
+                // Ctor
+                result
+                    .Append($"public {this.Name}(")
+                    .AppendJoin(", ", this.Properties.Select(m => $"{m.Type} {m.Name}"))
+                    .AppendLine(")")
+                    .AppendLine("{");
+                foreach (var m in this.Properties) result.AppendLine($"this.{m.Name} = {m.Name};");
+                result.AppendLine("}");
+
+                // Deconstruction
+                result
+                    .Append("public void Deconstruct(")
+                    .AppendJoin(", ", this.Properties.Select(m => $"out {m.Type} {m.Name}"))
+                    .AppendLine(")")
+                    .AppendLine("{");
+                foreach (var m in this.Properties) result.AppendLine($"{m.Name} = this.{m.Name};");
+                result.AppendLine("}");
+
+                // Custom code
                 result.AppendLine(this.CodeBuilder.ToString().TrimEnd());
+
+                // Close
                 result.AppendLine("}");
                 return result.ToString();
             }
@@ -140,19 +176,9 @@ public static class Globals
         foreach (var m in record.Members)
         {
             var ty = this.GetTypeString(m.Type);
-            var getSet = m.Mutable ? "get; set;" : "get; init;";
-            builder.CodeBuilder.AppendLine($"public {ty} {m.Name} {{ {getSet} }}");
+            builder.Properties.Add(new(ty, m.Name, m.Mutable));
         }
-
-        // Ctor
-        builder.CodeBuilder
-            .Append($"public {record.Name}(")
-            .AppendJoin(", ", record.Members.Select(m => $"{this.GetTypeString(m.Type)} {m.Name}"))
-            .AppendLine(")")
-            .AppendLine("{");
-        foreach (var m in record.Members) builder.CodeBuilder.AppendLine($"this.{m.Name} = {m.Name};");
-        builder.CodeBuilder.AppendLine("}");
-
+        
         return this.Default;
     }
 
@@ -179,18 +205,8 @@ public static class Globals
         foreach (var m in enumVariant.Members)
         {
             var ty = this.GetTypeString(m.Type);
-            var getSet = m.Mutable ? "get; set;" : "get; init;";
-            builder.CodeBuilder.AppendLine($"public {ty} {m.Name} {{ {getSet} }}");
+            builder.Properties.Add(new(ty, m.Name, m.Mutable));
         }
-
-        // Ctor
-        builder.CodeBuilder
-            .Append($"public {enumVariant.Name}(")
-            .AppendJoin(", ", enumVariant.Members.Select(m => $"{this.GetTypeString(m.Type)} {m.Name}"))
-            .AppendLine(")")
-            .AppendLine("{");
-        foreach (var m in enumVariant.Members) builder.CodeBuilder.AppendLine($"this.{m.Name} = {m.Name};");
-        builder.CodeBuilder.AppendLine("}");
 
         return this.Default;
     }

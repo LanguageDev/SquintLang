@@ -122,7 +122,10 @@ public abstract record class Expr : Ast
 
 public abstract record class Pattern : Ast
 {
-    public sealed record class Name(string Value) : Pattern;
+    public sealed record class Name(string Value) : Pattern
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Destructure(string Name_, ImmutableList<Pattern> Args) : Pattern;
 }
 

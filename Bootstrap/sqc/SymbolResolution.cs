@@ -200,6 +200,19 @@ public static class SymbolResolution
             this.PopScope();
             return this.Default;
         }
+
+        protected override object Visit(Expr.Match match)
+        {
+            this.Visit(match.Value);
+            // Each arm gets a scope
+            foreach (var arm in match.Arms)
+            {
+                this.PushScope();
+                this.Visit(arm);
+                this.PopScope();
+            }
+            return this.Default;
+        }
     }
 
     // Import resolution
@@ -304,6 +317,15 @@ public static class SymbolResolution
                 var.Symbol = new(var.Name, SymbolKind.Local);
                 var.Scope!.Define(var.Symbol);
             }
+            return this.Default;
+        }
+
+        protected override object Visit(Pattern.Name name)
+        {
+            base.Visit(name);
+            // Define local
+            name.Symbol = new(name.Value, SymbolKind.Local);
+            name.Scope!.Define(name.Symbol);
             return this.Default;
         }
     }
