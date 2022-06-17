@@ -396,7 +396,7 @@ public static class Globals
 
         for (var i = 0; i < match.Arms.Count; ++i)
         {
-            if (i > 0) this.CodeBuilder.AppendLine($"{armLabels[i]}:");
+            if (i > 0) this.CodeBuilder.AppendLine($"{armLabels[i]}:;");
             var arm = match.Arms[i];
             var patternMatcher = this.TranslatePattern(arm.Pattern, valueRes);
             // If the pattern does not match, go to the next label
