@@ -11,7 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using Compiler.Syntax;
+using Squint.Compiler.Syntax;
 
 namespace Squint.Compiler;
 

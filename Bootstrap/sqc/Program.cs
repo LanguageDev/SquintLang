@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using Compiler.Syntax;
+using Squint.Compiler.Syntax;
 
 namespace Squint.Compiler;
 

@@ -23,11 +23,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Antlr4 Include="Squint.g4">
+    <Antlr4 Include="SquintLexer.g4">
       <Listener>false</Listener>
       <Visitor>true</Visitor>
       <GAtn>false</GAtn>
-      <Package>Compiler.Syntax</Package>
+      <Package>Squint.Compiler.Syntax</Package>
+      <Error>true</Error>
+    </Antlr4>
+    
+    <Antlr4 Include="SquintParser.g4">
+      <Listener>false</Listener>
+      <Visitor>true</Visitor>
+      <GAtn>false</GAtn>
+      <Package>Squint.Compiler.Syntax</Package>
       <Error>true</Error>
     </Antlr4>
   </ItemGroup>

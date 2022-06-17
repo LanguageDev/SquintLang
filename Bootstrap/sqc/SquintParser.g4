@@ -1,6 +1,6 @@
-grammar Squint;
+parser grammar SquintParser;
 
-// Parser
+options { tokenVocab = SquintLexer; }
 
 file : declaration* EOF ;
 
@@ -146,13 +146,3 @@ name : IDENTIFIER;
 int_literal : INT_LITERAL;
 bool_literal : 'true' | 'false';
 str_literal : STR_LITERAL ;
-
-// Lexer
-
-COMMENT : '//' ~('\n' | '\r')* -> channel(HIDDEN) ;
-WHITESPACE : [ \r\n\t] -> channel(HIDDEN) ;
-IDENTIFIER : [A-Za-z_][A-Za-z0-9_]* ;
-INT_LITERAL : [0-9]+ ;
-STR_LITERAL : '"' ( EscapeSequence | ~('\\'|'"') )* '"' ;
-
-fragment EscapeSequence : '\\' [abfnrtv"\\] ;
