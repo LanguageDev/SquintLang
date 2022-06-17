@@ -361,6 +361,25 @@ public static class Globals
         return "default(Unit)";
     }
 
+    protected override string Visit(Expr.For @for)
+    {
+        var enumerable = this.Visit(@for.Iterated);
+        var enumerator = this.TmpName();
+        this.CodeBuilder.AppendLine($"var {enumerator} = {enumerable}.GetEnumerator();");
+        var startLabel = this.LabelName();
+        var endLabel = this.LabelName();
+        var itVar = this.GetLocalName(@for.IteratorSymbol!);
+        this.CodeBuilder
+            .AppendLine($"{startLabel}:;")
+            .AppendLine($"if (!{enumerator}.MoveNext()) goto {endLabel};")
+            .AppendLine($"var {itVar} = {enumerator}.Current;");
+        this.Visit(@for.Body);
+        this.CodeBuilder
+            .AppendLine($"goto {startLabel};")
+            .AppendLine($"{endLabel}:;");
+        return "default(Unit)";
+    }
+
     protected override string Visit(Expr.Match match)
     {
         var res = this.TmpName();

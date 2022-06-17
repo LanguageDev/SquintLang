@@ -202,6 +202,14 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Expr.For @for)
+        {
+            this.PushScope();
+            base.Visit(@for);
+            this.PopScope();
+            return this.Default;
+        }
+
         protected override object Visit(Expr.Match match)
         {
             this.Visit(match.Value);
@@ -318,6 +326,15 @@ public static class SymbolResolution
                 var.Symbol = new(var.Name, SymbolKind.Local);
                 var.Scope!.Define(var.Symbol);
             }
+            return this.Default;
+        }
+
+        protected override object Visit(Expr.For @for)
+        {
+            this.Visit(@for.Iterated);
+            @for.IteratorSymbol = new(@for.Iterator, SymbolKind.Local);
+            @for.Scope!.Define(@for.IteratorSymbol);
+            this.Visit(@for.Body);
             return this.Default;
         }
 

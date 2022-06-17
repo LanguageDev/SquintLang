@@ -108,6 +108,10 @@ public abstract record class Expr : Ast
     public sealed record class Block(ImmutableList<Stmt> Stmts, Expr? Value) : Expr;
     public sealed record class If(Expr Cond, Expr Then, Expr? Else) : Expr;
     public sealed record class While(Expr Cond, Expr Body) : Expr;
+    public sealed record class For(string Iterator, Expr Iterated, Expr Body) : Expr
+    {
+        public Symbol? IteratorSymbol { get; set; }
+    }
     public sealed record class Call(Expr Called, ImmutableList<Expr> Args) : Expr;
     public sealed record class Ury(string Op, Expr Subexpr) : Expr;
     public sealed record class Bin(string Op, Expr Left, Expr Right) : Expr;
@@ -226,6 +230,10 @@ public static class AstConverter
         SquintParser.While_statementContext w => new Stmt.Exp(new Expr.While(
             ToExpr(w.condition),
             StmtToExpr(w.body))),
+        SquintParser.For_statementContext f => new Stmt.Exp(new Expr.For(
+            f.name().GetText(),
+            ToExpr(f.iterable),
+            StmtToExpr(f.body))),
         SquintParser.Match_statementContext m => new Stmt.Exp(new Expr.Match(
             ToExpr(m.expression()),
             m.match_statement_arm().Select(ToExpr).Cast<Expr.MatchArm>().ToImmutableList())),
@@ -277,6 +285,10 @@ public static class AstConverter
         SquintParser.While_expressionContext w => new Expr.While(
             ToExpr(w.condition),
             ToExpr(w.body)),
+        SquintParser.For_expressionContext f => new Expr.For(
+            f.name().GetText(),
+            ToExpr(f.iterable),
+            ToExpr(f.body)),
         SquintParser.Assign_expressionContext asgn => new Expr.Bin(
             asgn.op.GetText(),
             ToExpr(asgn.left),
@@ -430,6 +442,7 @@ public abstract class AstVisitor<TResult>
         Expr.Index v => this.Visit(v),
         Expr.If v => this.Visit(v),
         Expr.While v => this.Visit(v),
+        Expr.For v => this.Visit(v),
         Expr.Match v => this.Visit(v),
         Expr.MatchArm v => this.Visit(v),
         _ => throw new NotImplementedException(),
@@ -602,6 +615,13 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
+    protected virtual TResult Visit(Expr.For @for)
+    {
+        this.Visit(@for.Iterated);
+        this.Visit(@for.Body);
+        return this.Default;
+    }
+
     protected virtual TResult Visit(Expr.Match match)
     {
         this.Visit(match.Value);
@@ -700,6 +720,7 @@ public abstract class AstTransformer
         Expr.Index v => this.Transform(v),
         Expr.If v => this.Transform(v),
         Expr.While v => this.Transform(v),
+        Expr.For v => this.Transform(v),
         Expr.Match v => this.Transform(v),
         Expr.MatchArm v => this.Transform(v),
         _ => throw new NotImplementedException(),
@@ -814,6 +835,11 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.While @while) => new Expr.While(
         this.Transform(@while.Cond),
         this.Transform(@while.Body));
+
+    public virtual Expr Transform(Expr.For @for) => new Expr.For(
+        @for.Iterator,
+        this.Transform(@for.Iterated),
+        this.Transform(@for.Body));
 
     public virtual Expr Transform(Expr.Match match) => new Expr.Match(
         this.Transform(match.Value),
