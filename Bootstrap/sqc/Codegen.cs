@@ -169,7 +169,7 @@ public static class Globals
     private string GetTypeString(Expr expr) => expr switch
     {
         Expr.Name name => name.Symbol!.FullName,
-        Expr.Index index => $"{this.GetTypeString(index.Indexed)}<{string.Join(", ", index.Indices.Select(GetTypeString))}>",
+        Expr.Index index => $"{this.GetTypeString(index.Indexed)}<{string.Join(", ", index.Indices.Select(this.GetTypeString))}>",
         Expr.MemberAccess maccess => $"{this.GetTypeString(maccess.Instance)}.{maccess.Member}",
         _ => throw new NotImplementedException(),
     };
