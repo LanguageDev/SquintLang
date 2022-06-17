@@ -87,10 +87,7 @@ expression : atom_expression                                                 # w
            ;
 rel_op : '>' | '<' | '>=' | '<=' | '==' | '!=' ;
 assign_op : '=' | '+=' | '-=' | '*=' | '/=' ;
-atom_expression : int_literal
-                | bool_literal
-                | char_literal
-                | str_literal
+atom_expression : literal
                 | name
                 | block_expression
                 | if_expression
@@ -140,10 +137,19 @@ match_statement_arm : pattern '->' statement ;
 pattern : '_'                                   # discard_pattern
         | name                                  # name_pattern
         | name ('.' name)* '(' pattern_list ')' # destructure_pattern
+        | literal                               # literal_pattern
         ;
 pattern_list : (pattern (',' pattern)* ','?)? ;
 
 name : IDENTIFIER;
+
+literal : int_literal
+        | char_literal
+        | bool_literal
+        | char_literal
+        | str_literal
+        ;
+
 int_literal : INT_LITERAL;
 char_literal : CHAR_LITERAL;
 bool_literal : 'true' | 'false';

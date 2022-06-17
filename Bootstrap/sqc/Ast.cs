@@ -135,6 +135,8 @@ public abstract record class Pattern : Ast
     {
         public Symbol? NameSymbol { get; set; }
     }
+    public sealed record class Literal(string Value) : Pattern;
+    public sealed record class Discard : Pattern;
 }
 
 public static class AstConverter
@@ -245,6 +247,7 @@ public static class AstConverter
         SquintParser.Grouping_expressionContext grouping => ToExpr(grouping.expression()),
         SquintParser.Wrapped_expressionContext wrapped => ToExpr(wrapped.GetChild(0)),
         SquintParser.Atom_expressionContext atom => ToExpr(atom.GetChild(0)),
+        SquintParser.LiteralContext l => ToExpr(l.GetChild(0)),
         SquintParser.NameContext name => new Expr.Name(name.GetText()),
         SquintParser.Int_literalContext intLit => new Expr.Lit(intLit.GetText()),
         SquintParser.Bool_literalContext boolLit => new Expr.Lit(boolLit.GetText()),
@@ -327,6 +330,8 @@ public static class AstConverter
         SquintParser.Destructure_patternContext d => new Pattern.Destructure(
             string.Join('.', d.name().Select(n => n.GetText())),
             d.pattern_list().pattern().Select(ToPattern).ToImmutableList()),
+        SquintParser.Literal_patternContext l => new Pattern.Literal(l.GetText()),
+        SquintParser.Discard_patternContext => new Pattern.Discard(),
         _ => throw new NotImplementedException(),
     };
 
@@ -455,6 +460,8 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Pattern pattern) => pattern switch
     {
         Pattern.Name v => this.Visit(v),
+        Pattern.Discard v => this.Visit(v),
+        Pattern.Literal v => this.Visit(v),
         Pattern.Destructure v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
@@ -641,6 +648,8 @@ public abstract class AstVisitor<TResult>
     }
 
     protected virtual TResult Visit(Pattern.Name name) => this.Default;
+    protected virtual TResult Visit(Pattern.Discard discard) => this.Default;
+    protected virtual TResult Visit(Pattern.Literal literal) => this.Default;
 
     protected virtual TResult Visit(Pattern.Destructure destructure)
     {
@@ -734,6 +743,8 @@ public abstract class AstTransformer
     {
         Pattern.Name v => this.Transform(v),
         Pattern.Destructure v => this.Transform(v),
+        Pattern.Discard v => this.Transform(v),
+        Pattern.Literal v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -854,6 +865,8 @@ public abstract class AstTransformer
         this.Transform(matchArm.Value));
 
     public virtual Pattern Transform(Pattern.Name name) => name;
+    public virtual Pattern Transform(Pattern.Discard discard) => discard;
+    public virtual Pattern Transform(Pattern.Literal literal) => literal;
 
     public virtual Pattern Transform(Pattern.Destructure destructure) => new Pattern.Destructure(
         destructure.Name_,

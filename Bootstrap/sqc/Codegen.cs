@@ -193,7 +193,11 @@ public static class Globals
                 .Select(a => (Pattern: a, Name: this.TmpName()))
                 .ToList();
             var outArgs = string.Join(", ", boundArgs.Select(b => $"out var {b.Name}"));
-            var remPattern = string.Join("", boundArgs.Select(a => $" && {this.TranslatePattern(a.Pattern, a.Name)}"));
+            var remPatterns = boundArgs
+                .Select(a => this.TranslatePattern(a.Pattern, a.Name))
+                .Where(a => !string.IsNullOrWhiteSpace(a))
+                .ToList();
+            var remPattern = string.Join("", remPatterns.Select(p => $" && {p}"));
             return $"({parent} is {ty} {boundName} && {boundName}.Deconstruct({outArgs}){remPattern})";
         }
 
@@ -202,6 +206,12 @@ public static class Globals
             var targetName = this.GetLocalName(n.Symbol!);
             return $"Prelude.CopyOut({parent}, out var {targetName})";
         }
+
+        case Pattern.Discard:
+            return "true";
+
+        case Pattern.Literal lit:
+            return $"{parent}.Equals({lit.Value})";
 
         default:
             throw new NotImplementedException();
