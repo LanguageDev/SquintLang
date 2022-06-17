@@ -1,0 +1,56 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Squint",
+	"patterns": [
+        { "include": "#keywords" },
+		{ "include": "#line_comment" },
+		{ "include": "#builtin_types" },
+		{ "include": "#strings" },
+		{ "include": "#integer_literals" },
+		{ "include": "#boolean_constants" },
+		{ "include": "#identifiers" }
+	],
+	"repository": {
+        "line_comment": {
+			"name": "comment.line.double-slash.squint",
+			"begin": "//",
+      		"end": "$"
+		},
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.squint",
+				"match": "\\b(import|if|then|else|while|do|for|return|match|with|func|type|var|val|trait|this|in)\\b"
+			}]
+		},
+        "builtin_types": {
+			"patterns": [{
+				"name": "storage.type.squint",
+				"match": "\\b(unit|bool|string|char|int|uint|int8|int16|int32|int64|uint8|uint16|uint32|uint64)\\b"
+			}]
+		},
+		"strings": {
+			"name": "string.quoted.double.squint",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.squint",
+					"match": "\\\\."
+				}
+			]
+		},
+        "integer_literals": {
+			"name": "constant.numeric.integer.decimal.squint",
+      		"match": "\\b[0-9]+\\b"
+		},
+		"identifiers": {
+			"name": "entity.name.function.squint",
+			"match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+		},
+		"boolean_constants": {
+			"name": "constant.language.boolean.squint",
+			"match": "\\b(true|false)\\b"
+		}
+	},
+	"scopeName": "source.squint"
+}

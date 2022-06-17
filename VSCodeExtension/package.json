@@ -1,0 +1,25 @@
+{
+    "name": "squint-language-support",
+    "displayName": "Squint Language Support",
+    "description": "Basic VS Code language support for the Squint programming language.",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.68.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "squint",
+            "aliases": ["Squint", "squint"],
+            "extensions": [".squint .sq"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "squint",
+            "scopeName": "source.squint",
+            "path": "./syntaxes/squint.tmLanguage.json"
+        }]
+    }
+}

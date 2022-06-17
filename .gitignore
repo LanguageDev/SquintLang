@@ -3,9 +3,11 @@ bin
 doc
 .antlr
 .vs
-.vscode
+.vscode/*
 *.filters
 *.user
 TestResults
 CoverageResults
 node_modules
+
+!.vscode/launch.json
