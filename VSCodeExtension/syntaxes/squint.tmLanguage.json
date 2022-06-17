@@ -19,7 +19,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.squint",
-				"match": "\\b(import|if|then|else|while|do|for|return|match|with|func|type|var|val|trait|this|in)\\b"
+				"match": "\\b(import|if|then|else|while|do|for|return|match|with|func|type|var|val|trait|impl|this|in)\\b"
 			}]
 		},
         "builtin_types": {

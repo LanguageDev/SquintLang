@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "sqc": {
+      "commandName": "Project",
+      "commandLineArgs": "test.squint --dump-cs --run"
+    }
+  }
+}

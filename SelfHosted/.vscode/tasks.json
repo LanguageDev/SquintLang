@@ -1,0 +1,9 @@
+{
+    "version": "2.0.0",
+    "tasks": [{
+        "label": "compile",
+        "command": "../Bootstrap/sqc/bin/Debug/net6.0/sqc.exe",
+        "args": ["main.squint", "--out", "bin/squint-self-hosted"],
+        "type": "shell"
+    }]
+}

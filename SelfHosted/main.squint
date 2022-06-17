@@ -1,19 +1,4 @@
 
-type Span(val Start: int, val End: int);
-
-type TokenType =
-    | End
-    | Identifier
-    | KeywordIf
-    | LiteralInt
-    | OpenParen
-    | CloseParen
-    ;
-
-type Token(val Text: string, val TokenType: TokenType, val Span: Span);
-
-type Lexer(text: string, offset: int);
-
 func main() {
-
+    System.Console.WriteLine("Hello, World!");
 }

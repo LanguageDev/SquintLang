@@ -117,6 +117,14 @@ public static class Prelude
     }}
 }}
 
+public static class Program
+{{
+    public static void Main(string[] args)
+    {{
+        Globals.main();
+    }}
+}}
+
 public static class Globals
 {{
     {this.globalsBuilder}
