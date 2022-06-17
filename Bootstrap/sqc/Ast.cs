@@ -302,6 +302,9 @@ public static class AstConverter
         SquintParser.Match_statement_armContext a => new Expr.MatchArm(
             ToPattern(a.pattern()),
             new Expr.Block(ImmutableList.Create(ToStmt(a.statement())), null)),
+        SquintParser.Index_expressionContext i => new Expr.Index(
+            ToExpr(i.array),
+            i.indices.expression().Select(ToExpr).ToImmutableList()),
         _ => throw new NotImplementedException(),
     };
 

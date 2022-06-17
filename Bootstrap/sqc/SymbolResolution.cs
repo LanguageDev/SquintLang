@@ -36,13 +36,16 @@ public sealed record class Scope(
 
     public void Define(Symbol sym, string? nameOverride = null)
     {
-        if (!this.Symbols.TryGetValue(nameOverride ?? sym.Name, out var existing))
+        var name = nameOverride ?? sym.Name;
+        if (!this.Symbols.TryGetValue(name, out var existing))
         {
-            this.Symbols.Add(nameOverride ?? sym.Name, sym);
+            this.Symbols.Add(name, sym);
             return;
         }
 
         if (sym.Kind != existing.Kind) throw new InvalidOperationException();
+        // Override anyway
+        this.Symbols[name] = sym;
     }
 
     public Symbol? ReferenceOpt(string name)

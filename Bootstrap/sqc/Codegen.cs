@@ -174,6 +174,13 @@ public static class Globals
         _ => throw new NotImplementedException(),
     };
 
+    private bool IsType(Expr expr) => expr switch
+    {
+        Expr.Name name => name.Symbol!.Kind == SymbolKind.Type,
+        Expr.Index i => this.IsType(i.Indexed) && i.Indices.All(this.IsType),
+        _ => false,
+    };
+
     private string TranslatePattern(Pattern p, string parent)
     {
         switch (p)
@@ -431,14 +438,31 @@ public static class Globals
         return res;
     }
 
+    protected override string Visit(Expr.Index index)
+    {
+        if (this.IsType(index.Indexed))
+        {
+            // Generic type
+            return this.GetTypeString(index);
+        }
+        else
+        {
+            // Indexing
+            var indexed = this.Visit(index.Indexed);
+            var indices = index.Indices
+                .Select(this.Visit)
+                .ToList();
+            return $"{indexed}[{string.Join(", ", indices)}]";
+        }
+    }
+
     protected override string Visit(Expr.Name name) => name.Symbol!.Kind == SymbolKind.Local
         ? this.GetLocalName(name.Symbol!)
         : name.Symbol!.FullName;
 
     protected override string Visit(Expr.Call call)
     {
-        var isCtor = call.Called is Expr.Name name
-            && name.Symbol!.Kind == SymbolKind.Type;
+        var isCtor = this.IsType(call.Called);
 
         var func = this.Visit(call.Called);
         var args = call.Args.Select(this.Visit).ToList();
