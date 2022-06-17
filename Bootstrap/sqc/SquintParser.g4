@@ -37,15 +37,15 @@ record_type_declaration : attribute_list 'type' name generic_param_list? ('(' ty
 du_type_declaration : attribute_list 'type' name generic_param_list? '=' ('|'? du_type_ctor ('|' du_type_ctor)*)? ';' ;
 du_type_ctor : attribute_list name ('(' type_declaration_member_list ')')? ;
 
-trait_declaration : 'trait' name generic_param_list? '{' trait_member* '}' ;
+trait_declaration : 'trait' name generic_param_list? OPEN_BRACE trait_member* CLOSE_BRACE ;
 
 trait_member : function_signature ';' # trait_function
              ;
 
 type_alias_declaration : 'type' name generic_param_list? '=' type ';' ;
 
-impl_declaration : 'impl' type '{' impl_member_declaration* '}'
-                 | 'impl' type 'for' type '{' impl_member_declaration* '}'
+impl_declaration : 'impl' type OPEN_BRACE impl_member_declaration* CLOSE_BRACE
+                 | 'impl' type 'for' type OPEN_BRACE impl_member_declaration* CLOSE_BRACE
                  ;
 
 impl_member_declaration : function_declaration ;
@@ -114,8 +114,8 @@ type_list : (type (',' type)* ','?)? ;
 
 array_expression : '[' expression_list ']' ;
 
-block_expression : '{' statement* expression? '}' ;
-block_statement  : '{' statement* '}' ;
+block_expression : OPEN_BRACE statement* expression? CLOSE_BRACE ;
+block_statement  : OPEN_BRACE statement* CLOSE_BRACE ;
 
 if_expression : 'if' condition=expression 'then' then=expression 'else' els=expression
               | 'if' condition=expression 'then' then=expression
@@ -145,4 +145,10 @@ pattern_list : (pattern (',' pattern)* ','?)? ;
 name : IDENTIFIER;
 int_literal : INT_LITERAL;
 bool_literal : 'true' | 'false';
-str_literal : STR_LITERAL ;
+
+str_literal : OPEN_QUOTE str_literal_content* CLOSE_QUOTE ;
+str_literal_content : STR_LIT_FIELD_REF        # str_element_field_ref
+                    | str_literal_interpolated # str_element_expr
+                    | STR_LIT_ELEMENT          # str_element_lit
+                    ;
+str_literal_interpolated : STR_LIT_INTERPOLATE_START expression '}' ;

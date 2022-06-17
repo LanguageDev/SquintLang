@@ -113,6 +113,7 @@ public abstract record class Expr : Ast
     public sealed record class Bin(string Op, Expr Left, Expr Right) : Expr;
     public sealed record class Rel(Expr Left, ImmutableList<(string Op, Expr Right)> Rights) : Expr;
     public sealed record class Lit(string Value) : Expr;
+    public sealed record class StrLit(ImmutableList<object> Pieces) : Expr;
     public sealed record class MemberAccess(Expr Instance, string Member) : Expr;
     public sealed record class MemberCall(Expr Instance, string Member, ImmutableList<Expr> Args) : Expr;
     public sealed record class Index(Expr Indexed, ImmutableList<Expr> Indices) : Expr;
@@ -239,7 +240,14 @@ public static class AstConverter
         SquintParser.NameContext name => new Expr.Name(name.GetText()),
         SquintParser.Int_literalContext intLit => new Expr.Lit(intLit.GetText()),
         SquintParser.Bool_literalContext boolLit => new Expr.Lit(boolLit.GetText()),
-        SquintParser.Str_literalContext strLit => new Expr.Lit(strLit.GetText()),
+        SquintParser.Str_literalContext strLit => new Expr.StrLit(
+            strLit.str_literal_content().Select(c => c switch
+            {
+                SquintParser.Str_element_litContext l => l.GetText() as object,
+                SquintParser.Str_element_field_refContext e => new Expr.Name(e.GetText()[1..]),
+                SquintParser.Str_element_exprContext e => ToExpr(e.str_literal_interpolated().expression()),
+                _ => throw new NotImplementedException(),
+            }).ToImmutableList()),
         SquintParser.Call_expressionContext call => new Expr.Call(
             ToExpr(call.func),
             call.args.expression().Select(ToExpr).ToImmutableList()),
@@ -415,6 +423,7 @@ public abstract class AstVisitor<TResult>
         Expr.Bin v => this.Visit(v),
         Expr.Rel v => this.Visit(v),
         Expr.Lit v => this.Visit(v),
+        Expr.StrLit v => this.Visit(v),
         Expr.MemberAccess v => this.Visit(v),
         Expr.MemberCall v => this.Visit(v),
         Expr.This v => this.Visit(v),
@@ -523,6 +532,11 @@ public abstract class AstVisitor<TResult>
 
     protected virtual TResult Visit(Expr.Name name) => this.Default;
     protected virtual TResult Visit(Expr.Lit lit) => this.Default;
+    protected virtual TResult Visit(Expr.StrLit strLit)
+    {
+        this.VisitAll(strLit.Pieces.OfType<Expr>());
+        return this.Default;
+    }
     protected virtual TResult Visit(Expr.This @this) => this.Default;
 
     protected virtual TResult Visit(Expr.Block block)
@@ -679,6 +693,7 @@ public abstract class AstTransformer
         Expr.Bin v => this.Transform(v),
         Expr.Rel v => this.Transform(v),
         Expr.Lit v => this.Transform(v),
+        Expr.StrLit v => this.Transform(v),
         Expr.MemberAccess v => this.Transform(v),
         Expr.MemberCall v => this.Transform(v),
         Expr.This v => this.Transform(v),
@@ -753,6 +768,12 @@ public abstract class AstTransformer
 
     public virtual Expr Transform(Expr.Name name) => name;
     public virtual Expr Transform(Expr.Lit lit) => lit;
+    public virtual Expr Transform(Expr.StrLit strLit) => new Expr.StrLit(
+        strLit.Pieces.Select(p => p switch
+        {
+            Expr e => this.Transform(e),
+            _ => p,
+        }).ToImmutableList());
     public virtual Expr Transform(Expr.This @this) => @this;
 
     public virtual Expr Transform(Expr.Block block) => new Expr.Block(

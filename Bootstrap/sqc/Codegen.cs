@@ -520,6 +520,40 @@ public static class Globals
 
     protected override string Visit(Expr.Lit lit) => lit.Value;
 
+    protected override string Visit(Expr.StrLit strLit)
+    {
+        if (strLit.Pieces.Count == 1 && strLit.Pieces[0] is string)
+        {
+            // Optimize for a string literal
+            return $"\"{strLit.Pieces[0]}\"";
+        }
+        else
+        {
+            // Build it up
+            var builder = this.TmpName();
+            var res = this.TmpName();
+
+            this.CodeBuilder.AppendLine($"var {builder} = new System.Text.StringBuilder();");
+            foreach (var p in strLit.Pieces)
+            {
+                if (p is Expr e)
+                {
+                    // Interpolated expression
+                    var eRes = this.Visit(e);
+                    this.CodeBuilder.AppendLine($"{builder}.Append({eRes}.ToString());");
+                }
+                else
+                {
+                    // Literal
+                    this.CodeBuilder.AppendLine($"{builder}.Append(\"{p}\");");
+                }
+            }
+            this.CodeBuilder.AppendLine($"var {res} = {builder}.ToString();");
+
+            return res;
+        }
+    }
+
     protected override string Visit(Expr.This @this) => "this";
 
     protected override string Visit(Expr.MemberAccess memberAccess) =>

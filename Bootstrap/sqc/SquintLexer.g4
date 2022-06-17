@@ -38,8 +38,8 @@ ARROW : '->' ;
 // Pairwise
 OPEN_PAREN : '(' ;
 CLOSE_PAREN : ')' ;
-OPEN_BRACE : '{' ;
-CLOSE_BRACE : '}' ;
+OPEN_BRACE : '{' -> pushMode(DEFAULT_MODE) ;
+CLOSE_BRACE : '}' -> popMode ;
 OPEN_BRACKET : '[' ;
 CLOSE_BRACKET : ']' ;
 
@@ -69,6 +69,19 @@ KW_FALSE : 'false' ;
 DISCARD : '_' ;
 IDENTIFIER : [A-Za-z_][A-Za-z0-9_]* ;
 INT_LITERAL : [0-9]+ ;
-STR_LITERAL : '"' ( EscapeSequence | ~('\\'|'"') )* '"' ;
 
-fragment EscapeSequence : '\\' [abfnrtv"\\] ;
+fragment EscapeSequence : '\\' [abfnrtv"\\$] ;
+
+OPEN_QUOTE : '"' -> pushMode(LineString) ;
+
+mode LineString ;
+
+CLOSE_QUOTE : '"' -> popMode ;
+
+STR_LIT_ELEMENT : ~('\\' | '"' | '$')+
+                | '$'
+                | ('\\' [abfnrtv"\\$])
+                ;
+STR_LIT_FIELD_REF : '$' IDENTIFIER ;
+
+STR_LIT_INTERPOLATE_START : '${' -> pushMode(DEFAULT_MODE) ;
