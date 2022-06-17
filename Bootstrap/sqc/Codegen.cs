@@ -377,9 +377,7 @@ public static class Globals
 
         for (var i = 0; i < match.Arms.Count; ++i)
         {
-            this.CodeBuilder.AppendLine($"{armLabels[i]}:");
-            // If there was a prev. arm, set its result to default here to avoid compile error
-            if (i > 0) this.CodeBuilder.AppendLine($"{armResults[i - 1]} = default;");
+            if (i > 0) this.CodeBuilder.AppendLine($"{armLabels[i]}:");
             var arm = match.Arms[i];
             var patternMatcher = this.TranslatePattern(arm.Pattern, valueRes);
             // If the pattern does not match, go to the next label
@@ -397,9 +395,12 @@ public static class Globals
             .AppendLine($"{armLabels[^1]}:")
             .AppendLine("throw new System.InvalidOperationException(\"Unhandled match case!\");");
 
-        // End label where we assign value
+        // End label
+        this.CodeBuilder.AppendLine($"{endLabel}:");
+        // We convince the compiler that everything is properly initialized
+        foreach (var r in armResults) this.CodeBuilder.AppendLine($"System.Runtime.CompilerServices.Unsafe.SkipInit(out {r});");
+        // Assign result value
         this.CodeBuilder
-            .AppendLine($"{endLabel}:")
             .AppendLine($"var {res} = {choiceVar} switch")
             .AppendLine("{");
         for (var i = 0; i < match.Arms.Count; ++i) this.CodeBuilder.AppendLine($"{i} => {armResults[i]},");
