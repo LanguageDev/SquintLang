@@ -1,12 +1,37 @@
+import System.Console.WriteLine;
 
 type Lexer(val text: string, var offset: int);
+
+#[derive(ToString)]
+type Token(val text: string);
 
 impl Lexer {
     // NOTE: Named arguments would be really nice here
     // Maybe Lexer(text = text, offset = 0) ?
     func new(text: string): Lexer = Lexer(text, 0);
+
+    func next(this): Token {
+        while true do {
+            if this.offset >= this.text.Length then return Token("");
+            if this.text[this.offset] == ' ' then {
+                this.offset += 1;
+            } else {
+                var start = this.offset;
+                while this.offset < this.text.Length and this.text[this.offset] != ' ' do {
+                    this.offset += 1;
+                }
+                return Token(this.text.Substring(start, this.offset - start));
+            }
+        }
+    }
 }
 
 func main() {
     val lexer = Lexer.new("hello world");
+    var hasTokens = true;
+    while hasTokens do {
+        var token = lexer.next();
+        if token.text == "" then hasTokens = false;
+        WriteLine(token);
+    }
 }
