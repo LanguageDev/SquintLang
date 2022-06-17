@@ -148,6 +148,12 @@ public static class Globals
     private string TmpName() => $"_tmp_{this.tmpCount++}";
     private string LabelName() => $"_label_{this.labelCount++}";
 
+    private static string EscapeKeyword(string str) => str switch
+    {
+        "new" => "@new",
+        _ => str,
+    };
+
     private string GetLocalName(Symbol symbol)
     {
         if (!this.variables.TryGetValue(symbol, out var name))
@@ -300,7 +306,7 @@ public static class Globals
         var stat = isInstance ? "" : "static ";
         var ov = isOverride ? "override " : "";
         this.CodeBuilder
-            .Append($"public {ov}{stat}{retType} {func.Signature.Name}(")
+            .Append($"public {ov}{stat}{retType} {EscapeKeyword(func.Signature.Name)}(")
             .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {this.GetLocalName(p.Symbol!)}"))
             .AppendLine(")")
             .AppendLine("{");
@@ -618,7 +624,7 @@ public static class Globals
     protected override string Visit(Expr.This @this) => "this";
 
     protected override string Visit(Expr.MemberAccess memberAccess) =>
-        $"{this.Visit(memberAccess.Instance)}.{memberAccess.Member}";
+        $"{this.Visit(memberAccess.Instance)}.{EscapeKeyword(memberAccess.Member)}";
 
     protected override string Visit(Expr.MemberCall memberCall)
     {
@@ -633,7 +639,7 @@ public static class Globals
         var args = memberCall.Args.Select(this.Visit).ToList();
 
         var res = this.TmpName();
-        var callExpr = $"{instance}.{memberCall.Member}({string.Join(", ", args)})";
+        var callExpr = $"{instance}.{EscapeKeyword(memberCall.Member)}({string.Join(", ", args)})";
 
         if (isCtor)
         {

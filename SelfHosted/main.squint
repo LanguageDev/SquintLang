@@ -1,4 +1,12 @@
 
+type Lexer(val text: string, var offset: int);
+
+impl Lexer {
+    // NOTE: Named arguments would be really nice here
+    // Maybe Lexer(text = text, offset = 0) ?
+    func new(text: string): Lexer = Lexer(text, 0);
+}
+
 func main() {
-    System.Console.WriteLine("Hello, World!");
+    val lexer = Lexer.new("hello world");
 }
