@@ -88,9 +88,20 @@ public static class SymbolResolution
                 });
 
             DefineBuiltinType("string");
+            DefineBuiltinType("char");
             DefineBuiltinType("int");
             DefineBuiltinType("bool");
             DefineBuiltinType("unit", "void");
+
+            DefineBuiltinType("int8", "sbyte");
+            DefineBuiltinType("int16", "short");
+            DefineBuiltinType("int32", "int");
+            DefineBuiltinType("int64", "long");
+
+            DefineBuiltinType("uint8", "byte");
+            DefineBuiltinType("uint16", "ushort");
+            DefineBuiltinType("uint32", "uint");
+            DefineBuiltinType("uint64", "ulong");
 
             // HACK: We register some namespaces
             this.globalScope.Define(new("System", SymbolKind.Namespace));

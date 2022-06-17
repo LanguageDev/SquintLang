@@ -89,6 +89,7 @@ rel_op : '>' | '<' | '>=' | '<=' | '==' | '!=' ;
 assign_op : '=' | '+=' | '-=' | '*=' | '/=' ;
 atom_expression : int_literal
                 | bool_literal
+                | char_literal
                 | str_literal
                 | name
                 | block_expression
@@ -144,6 +145,7 @@ pattern_list : (pattern (',' pattern)* ','?)? ;
 
 name : IDENTIFIER;
 int_literal : INT_LITERAL;
+char_literal : CHAR_LITERAL;
 bool_literal : 'true' | 'false';
 
 str_literal : OPEN_QUOTE str_literal_content* CLOSE_QUOTE ;

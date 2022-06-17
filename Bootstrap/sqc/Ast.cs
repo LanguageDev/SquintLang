@@ -248,6 +248,7 @@ public static class AstConverter
         SquintParser.NameContext name => new Expr.Name(name.GetText()),
         SquintParser.Int_literalContext intLit => new Expr.Lit(intLit.GetText()),
         SquintParser.Bool_literalContext boolLit => new Expr.Lit(boolLit.GetText()),
+        SquintParser.Char_literalContext chLit => new Expr.Lit(chLit.GetText()),
         SquintParser.Str_literalContext strLit => new Expr.StrLit(
             strLit.str_literal_content().Select(c => c switch
             {

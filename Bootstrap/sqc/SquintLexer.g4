@@ -69,8 +69,7 @@ KW_FALSE : 'false' ;
 DISCARD : '_' ;
 IDENTIFIER : [A-Za-z_][A-Za-z0-9_]* ;
 INT_LITERAL : [0-9]+ ;
-
-fragment EscapeSequence : '\\' [abfnrtv"\\$] ;
+CHAR_LITERAL : '\'' (~('\n' | '\r' | '\'') | ('\'' [abfnrtv'\\])) '\'' ;
 
 OPEN_QUOTE : '"' -> pushMode(LineString) ;
 
