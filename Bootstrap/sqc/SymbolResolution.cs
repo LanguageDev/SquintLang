@@ -28,6 +28,7 @@ public enum ScopeKind
     Type,
     Local,
     Function,
+    Loop,
 }
 
 public sealed record class Symbol(string Name, SymbolKind Kind)
@@ -43,6 +44,9 @@ public sealed record class Scope(
     ScopeKind Kind)
 {
     public bool IsGlobal => this.Parent is null;
+
+    public Symbol? BreakSymbol { get; set; }
+    public Symbol? ContinueSymbol { get; set; }
 
     public void Define(Symbol sym, string? nameOverride = null)
     {
@@ -86,6 +90,7 @@ public static class SymbolResolution
 
         private readonly Scope globalScope;
         private Scope currentScope;
+        private int labelCount = 0;
 
         public Pass1()
         {
@@ -234,9 +239,23 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Expr.While @while)
+        {
+            this.PushScope(ScopeKind.Loop);
+            // NOTE: We don't register them, lookup is based on scope
+            this.currentScope.BreakSymbol = new("", SymbolKind.Label);
+            this.currentScope.ContinueSymbol = new("", SymbolKind.Label);
+            base.Visit(@while);
+            this.PopScope();
+            return this.Default;
+        }
+
         protected override object Visit(Expr.For @for)
         {
-            this.PushScope(ScopeKind.Local);
+            this.PushScope(ScopeKind.Loop);
+            // NOTE: We don't register them, lookup is based on scope
+            this.currentScope.BreakSymbol = new("", SymbolKind.Label);
+            this.currentScope.ContinueSymbol = new("", SymbolKind.Label);
             base.Visit(@for);
             this.PopScope();
             return this.Default;
@@ -361,9 +380,21 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        private static Scope? LookUpLoop(Scope scope)
+        {
+            if (scope.Kind == ScopeKind.Loop) return scope;
+            if (scope.Parent is null) return null;
+            return LookUpLoop(scope.Parent);
+        }
+
         protected override object Visit(Stmt.Goto @goto)
         {
-            @goto.Symbol = @goto.Scope!.Reference(@goto.Name);
+            @goto.Symbol = @goto.Name switch
+            {
+                "break" => LookUpLoop(@goto.Scope!)?.BreakSymbol ?? throw new InvalidOperationException(),
+                "continue" => LookUpLoop(@goto.Scope!)?.ContinueSymbol ?? throw new InvalidOperationException(),
+                _ => @goto.Scope!.Reference(@goto.Name),
+            };
             return this.Default;
         }
 

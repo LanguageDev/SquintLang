@@ -406,8 +406,8 @@ public static class Globals
 
     protected override string Visit(Expr.While @while)
     {
-        var startLabel = this.LabelName();
-        var endLabel = this.LabelName();
+        var startLabel = this.GetLocalName(@while.Body.Scope!.ContinueSymbol!);
+        var endLabel = this.GetLocalName(@while.Body.Scope!.BreakSymbol!);
         this.CodeBuilder.AppendLine($"{startLabel}:;");
         var cond = this.Visit(@while.Cond);        
         this.CodeBuilder.AppendLine($"if (!{cond}) goto {endLabel};");
@@ -422,8 +422,8 @@ public static class Globals
         var enumerable = this.Visit(@for.Iterated);
         var enumerator = this.TmpName();
         this.CodeBuilder.AppendLine($"var {enumerator} = {enumerable}.GetEnumerator();");
-        var startLabel = this.LabelName();
-        var endLabel = this.LabelName();
+        var startLabel = this.GetLocalName(@for.Body.Scope!.ContinueSymbol!);
+        var endLabel = this.GetLocalName(@for.Body.Scope!.BreakSymbol!);
         var itVar = this.GetLocalName(@for.IteratorSymbol!);
         this.CodeBuilder
             .AppendLine($"{startLabel}:;")
@@ -537,6 +537,8 @@ public static class Globals
         var op = bin.Op switch
         {
             "and" => "&&",
+            "or" => "||",
+            "rem" => "%",
             _ => bin.Op,
         };
 
@@ -581,7 +583,10 @@ public static class Globals
             var left = this.Visit(bin.Left);
             var right = this.Visit(bin.Right);
 
-            this.CodeBuilder.AppendLine($"var {res} = {left} {op} {right};");
+            var expr = op == "mod"
+                ? $"({left} % {right} + {right}) % {right}"
+                : $"{left} {op} {right}";
+            this.CodeBuilder.AppendLine($"var {res} = {expr};");
         }
 
         return res;
