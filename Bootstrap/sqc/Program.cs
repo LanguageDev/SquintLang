@@ -66,6 +66,18 @@ internal class Program
         return (T)Delegate.CreateDelegate(typeof(T), methodInfo);
     }
 
+    private static void Execute(string name)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            Arguments = $"exec {name}.dll",
+        };
+        var process = Process.Start(startInfo) ?? throw new InvalidOperationException();
+        process.WaitForExit();
+        Console.WriteLine($"Process terminated with exit code: {process.ExitCode}");
+    }
+
     private static void Main(string[] args)
     {
         if (args.Length < 1)
@@ -99,5 +111,7 @@ internal class Program
             Environment.Exit(1);
             return;
         }
+
+        if (args.Contains("--run")) Execute(output);
     }
 }

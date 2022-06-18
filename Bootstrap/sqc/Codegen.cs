@@ -185,6 +185,7 @@ public static class Globals
         Expr.Name name => name.Symbol!.FullName,
         Expr.Index index => $"{this.GetTypeString(index.Indexed)}<{string.Join(", ", index.Indices.Select(this.GetTypeString))}>",
         Expr.MemberAccess maccess => $"{this.GetTypeString(maccess.Instance)}.{maccess.Member}",
+        Expr.FuncType func => $"System.Func<{string.Join(", ", func.Params.Append(func.Return).Select(this.GetTypeString))}>",
         _ => throw new NotImplementedException(),
     };
 

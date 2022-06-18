@@ -123,6 +123,7 @@ public abstract record class Expr : Ast
     public sealed record class Index(Expr Indexed, ImmutableList<Expr> Indices) : Expr;
     public sealed record class Match(Expr Value, ImmutableList<MatchArm> Arms) : Expr;
     public sealed record class MatchArm(Pattern Pattern, Expr Value) : Expr;
+    public sealed record class FuncType(ImmutableList<Expr> Params, Expr Return) : Expr;
 }
 
 public abstract record class Pattern : Ast
@@ -309,6 +310,7 @@ public static class AstConverter
         SquintParser.Index_expressionContext i => new Expr.Index(
             ToExpr(i.array),
             i.indices.expression().Select(ToExpr).ToImmutableList()),
+        SquintParser.Func_typeContext t => ToType(t),
         _ => throw new NotImplementedException(),
     };
 
@@ -321,6 +323,9 @@ public static class AstConverter
         SquintParser.Nested_typeContext n => new Expr.MemberAccess(
             ToType(n.type()),
             n.name().GetText()),
+        SquintParser.Func_typeContext f => new Expr.FuncType(
+            f.param_types.type().Select(ToType).ToImmutableList(),
+            ToType(f.return_type)),
         _ => throw new NotImplementedException(),
     };
 
@@ -454,6 +459,7 @@ public abstract class AstVisitor<TResult>
         Expr.For v => this.Visit(v),
         Expr.Match v => this.Visit(v),
         Expr.MatchArm v => this.Visit(v),
+        Expr.FuncType v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -647,6 +653,13 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
+    protected virtual TResult Visit(Expr.FuncType funcType)
+    {
+        this.VisitAll(funcType.Params);
+        this.Visit(funcType.Return);
+        return this.Default;
+    }
+
     protected virtual TResult Visit(Pattern.Name name) => this.Default;
     protected virtual TResult Visit(Pattern.Discard discard) => this.Default;
     protected virtual TResult Visit(Pattern.Literal literal) => this.Default;
@@ -736,6 +749,7 @@ public abstract class AstTransformer
         Expr.For v => this.Transform(v),
         Expr.Match v => this.Transform(v),
         Expr.MatchArm v => this.Transform(v),
+        Expr.FuncType v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -863,6 +877,10 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.MatchArm matchArm) => new Expr.MatchArm(
         this.Transform(matchArm.Pattern),
         this.Transform(matchArm.Value));
+
+    public virtual Expr Transform(Expr.FuncType funcType) => new Expr.FuncType(
+        this.TransformAll(funcType.Params),
+        this.Transform(funcType.Return));
 
     public virtual Pattern Transform(Pattern.Name name) => name;
     public virtual Pattern Transform(Pattern.Discard discard) => discard;

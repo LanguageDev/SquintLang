@@ -1,20 +1,40 @@
 import System.Console.WriteLine;
 
-type Lexer(val text: string, var offset: int);
+type Lexer(val Text: string, var Offset: int);
 
 #[derive(ToString)]
-type Token(val text: string);
+type Token(val Text: string);
 
 impl Lexer {
     // NOTE: Named arguments would be really nice here
-    // Maybe Lexer(text = text, offset = 0) ?
+    // Maybe Lexer(Text = text, Offset = 0) ?
     func new(text: string): Lexer = Lexer(text, 0);
 
     func next(this): Token {
+        var start = this.Offset;
+
+        func is_end(): bool = this.Offset >= this.Text.Length;
+
+        func consume_while(pred: (char) -> bool) {
+            while this.Offset < this.Text.Length && pred(this.Text[this.Offset]) do {
+                this.Offset += 1;
+            }
+        }
+
+        func skip_token() {
+            start = this.Offset;
+        }
+
+        func make_token(): Token {
+            val text = this.Text.Substring(start, this.Offset - start);
+            start = this.Offset;
+            return Token(text);
+        }
+
         while true do {
-            if this.offset >= this.text.Length then return Token("");
-            if this.text[this.offset] == ' ' then {
-                this.offset += 1;
+            if this.offset >= this.text.Length then return make_token();
+            if char.IsWhieSpace(this.Text[this.Offset]) then {
+                this.Offset += 1;
             } else {
                 var start = this.offset;
                 while this.offset < this.text.Length and this.text[this.offset] != ' ' do {
