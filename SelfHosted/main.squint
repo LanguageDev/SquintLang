@@ -14,44 +14,53 @@ impl Lexer {
         var start = this.Offset;
 
         func is_end(): bool = this.Offset >= this.Text.Length;
+        func current(): char = this.Text[this.Offset];
+        func step() = this.Offset += 1;
 
         func consume_while(pred: (char) -> bool) {
-            while this.Offset < this.Text.Length && pred(this.Text[this.Offset]) do {
-                this.Offset += 1;
-            }
+            while not is_end() and pred(current()) do step();
         }
 
-        func skip_token() {
+        func skip() = start = this.Offset;
+        func take(): string {
+            var text = this.Text.Substring(start, this.Offset - start);
             start = this.Offset;
+            return text;
         }
 
-        func make_token(): Token {
-            val text = this.Text.Substring(start, this.Offset - start);
-            start = this.Offset;
-            return Token(text);
-        }
+        func is_ident(ch: char): bool = char.IsLetterOrDigit(ch) or ch == '_';
 
-        while true do {
-            if this.offset >= this.text.Length then return make_token();
-            if char.IsWhieSpace(this.Text[this.Offset]) then {
-                this.Offset += 1;
-            } else {
-                var start = this.offset;
-                while this.offset < this.text.Length and this.text[this.offset] != ' ' do {
-                    this.offset += 1;
-                }
-                return Token(this.text.Substring(start, this.offset - start));
-            }
+    begin:
+        // EOF
+        if is_end() then return Token("<EOF>");
+
+        // Space
+        if char.IsWhiteSpace(current()) then {
+            consume_while(char.IsWhiteSpace);
+            skip();
+            goto begin;
         }
+        // Integer literal
+        if char.IsDigit(current()) then {
+            consume_while(char.IsDigit);
+            return Token(take());
+        }
+        // Identifier
+        if is_ident(current()) then {
+            consume_while(is_ident);
+            return Token(take());
+        }
+        // Unknown
+        step();
+        return Token(take());
     }
 }
 
 func main() {
-    val lexer = Lexer.new("hello world");
-    var hasTokens = true;
-    while hasTokens do {
+    val lexer = Lexer.new("hello world 123 hi_3");
+    while true do {
         var token = lexer.next();
-        if token.text == "" then hasTokens = false;
         WriteLine(token);
+        if token.Text == "<EOF>" then goto break;
     }
 }

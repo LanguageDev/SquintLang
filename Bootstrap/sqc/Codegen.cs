@@ -137,6 +137,7 @@ public static class Globals
     private readonly Dictionary<Symbol, string> variables = new();
     private readonly StringBuilder globalsBuilder = new();
     private readonly Stack<StringBuilder> codeStack = new();
+    private readonly Stack<string> funcReturnTypes = new();
     private int tmpCount;
     private int labelCount;
 
@@ -309,6 +310,7 @@ public static class Globals
     protected override string Visit(Decl.Func func)
     {
         var retType = func.Signature.Ret is null ? "void" : this.GetTypeString(func.Signature.Ret);
+        this.funcReturnTypes.Push(retType);
         var isInstance = func.Signature.Params.Count > 0 && func.Signature.Params[0].Name == "this";
         var isOverride = func.Attributes.Any(attr => attr.Name == "override");
 
@@ -327,6 +329,8 @@ public static class Globals
         this.Visit(func.Body);
 
         this.CodeBuilder.AppendLine("}");
+
+        this.funcReturnTypes.Pop();
 
         return this.Default;
     }
@@ -361,7 +365,17 @@ public static class Globals
         else
         {
             var res = this.Visit(@return.Value);
-            this.CodeBuilder.AppendLine($"return {res};");
+            if (this.funcReturnTypes.Peek() == "void")
+            {
+                // The result can still contain effects!
+                this.CodeBuilder
+                    .AppendLine($"{DeVoid(res)};")
+                    .AppendLine("return;");
+            }
+            else
+            {
+                this.CodeBuilder.AppendLine($"return {res};");
+            }
         }
         return this.Default;
     }
@@ -580,7 +594,7 @@ public static class Globals
             this.CodeBuilder
                 .AppendLine($"if ({left})")
                 .AppendLine("{")
-                .AppendLine($"{res} = true")
+                .AppendLine($"{res} = true;")
                 .AppendLine("}")
                 .AppendLine("else")
                 .AppendLine("{");
