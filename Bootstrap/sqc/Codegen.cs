@@ -33,7 +33,7 @@ public sealed class Codegen : AstVisitor<string>
         public bool Abstract { get; set; } = false;
         public bool Open { get; set; } = false;
         public string Name { get; set; } = "Unnamed";
-        public HashSet<string> Bases { get; set; } = new();
+        public List<string> Bases { get; set; } = new();
         public StringBuilder CodeBuilder { get; set; } = new();
         public List<PropInfo> Properties { get; set; } = new();
         public Dictionary<Symbol, TypeBuilder> SubtypeBuilders { get; set; } = new();
@@ -50,7 +50,7 @@ public sealed class Codegen : AstVisitor<string>
                 if (!this.Open && !this.Abstract) result.Append("sealed ");
                 result.Append(this.Kind).Append(' ');
                 result.Append(this.Name);
-                if (this.Bases.Count > 0) result.Append(" : ").AppendJoin(", ", this.Bases);
+                if (this.Bases.Count > 0) result.Append(" : ").AppendJoin(", ", this.Bases.Distinct());
                 result.AppendLine();
                 result.AppendLine("{");
 
@@ -275,7 +275,7 @@ public static class Globals
         var builder = this.GetTypeBuilder(enumVariant.Symbol!);
 
         // Base type
-        builder.Bases.Add(baseBuilder.Name);
+        builder.Bases.Insert(0, baseBuilder.Name);
 
         // Properties
         foreach (var m in enumVariant.Members)
