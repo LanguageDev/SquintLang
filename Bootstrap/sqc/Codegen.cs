@@ -148,6 +148,15 @@ public static class Globals
     private string TmpName() => $"_tmp_{this.tmpCount++}";
     private string LabelName() => $"_label_{this.labelCount++}";
 
+    private static bool IsFunctionLocal(Scope scope) => scope.Kind switch
+    {
+        ScopeKind.Local => IsFunctionLocal(scope.Parent!),
+        ScopeKind.Function => true,
+        ScopeKind.Type => false,
+        ScopeKind.Global => false,
+        _ => throw new NotImplementedException(),
+    };
+
     private static string EscapeKeyword(string str) => str switch
     {
         "new" => "@new",
@@ -304,10 +313,13 @@ public static class Globals
         var isOverride = func.Attributes.Any(attr => attr.Name == "override");
 
         var relParams = isInstance ? func.Signature.Params.Skip(1) : func.Signature.Params;
-        var stat = isInstance ? "" : "static ";
-        var ov = isOverride ? "override " : "";
+        var stat = isInstance ? "" : "static";
+        var ov = isOverride ? "override" : "";
+        var qualifiers = IsFunctionLocal(func.Scope!)
+            ? ""
+            : $"public {ov} {stat}";
         this.CodeBuilder
-            .Append($"public {ov}{stat}{retType} {EscapeKeyword(func.Signature.Name)}(")
+            .Append($"{qualifiers} {retType} {EscapeKeyword(func.Signature.Name)}(")
             .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {this.GetLocalName(p.Symbol!)}"))
             .AppendLine(")")
             .AppendLine("{");

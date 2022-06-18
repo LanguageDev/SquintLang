@@ -21,6 +21,14 @@ public enum SymbolKind
     Namespace,
 }
 
+public enum ScopeKind
+{
+    Global,
+    Type,
+    Local,
+    Function,
+}
+
 public sealed record class Symbol(string Name, SymbolKind Kind)
 {
     public object UniqueKey { get; set; } = new();
@@ -30,7 +38,8 @@ public sealed record class Symbol(string Name, SymbolKind Kind)
 
 public sealed record class Scope(
     Scope? Parent,
-    IDictionary<string, Symbol> Symbols)
+    IDictionary<string, Symbol> Symbols,
+    ScopeKind Kind)
 {
     public bool IsGlobal => this.Parent is null;
 
@@ -71,14 +80,15 @@ public static class SymbolResolution
     // Define scope and order-independent symbols
     private sealed class Pass1 : AstVisitor<object>
     {
-        private static Scope MakeScope(Scope? parent = null) => new(parent, new Dictionary<string, Symbol>());
+        private static Scope MakeScope(ScopeKind kind, Scope? parent = null) =>
+            new(parent, new Dictionary<string, Symbol>(), kind);
 
         private readonly Scope globalScope;
         private Scope currentScope;
 
         public Pass1()
         {
-            this.globalScope = MakeScope();
+            this.globalScope = MakeScope(ScopeKind.Global);
             this.currentScope = this.globalScope;
 
             void DefineBuiltinType(string name, string? realName = null) =>
@@ -107,7 +117,7 @@ public static class SymbolResolution
             this.globalScope.Define(new("System", SymbolKind.Namespace));
         }
 
-        private void PushScope() => this.currentScope = MakeScope(this.currentScope);
+        private void PushScope(ScopeKind kind) => this.currentScope = MakeScope(kind, this.currentScope);
         private void PopScope() => this.currentScope = this.currentScope.Parent
                                                     ?? throw new InvalidOperationException();
 
@@ -142,7 +152,7 @@ public static class SymbolResolution
             func.Signature.Symbol = new(func.Signature.Name, SymbolKind.Func);
             this.currentScope.Define(func.Signature.Symbol);
 
-            this.PushScope();
+            this.PushScope(ScopeKind.Function);
             base.Visit(func);
             this.PopScope();
             return this.Default;
@@ -153,7 +163,7 @@ public static class SymbolResolution
             record.Symbol = new(record.Name, SymbolKind.Type);
             this.currentScope.Define(record.Symbol);
 
-            this.PushScope();
+            this.PushScope(ScopeKind.Type);
             base.Visit(record);
             this.PopScope();
             return this.Default;
@@ -164,7 +174,7 @@ public static class SymbolResolution
             @enum.Symbol = new(@enum.Name, SymbolKind.Type);
             this.currentScope.Define(@enum.Symbol);
 
-            this.PushScope();
+            this.PushScope(ScopeKind.Type);
             base.Visit(@enum);
             this.PopScope();
 
@@ -183,7 +193,7 @@ public static class SymbolResolution
             };
             this.currentScope.Define(enumVariant.Symbol);
 
-            this.PushScope();
+            this.PushScope(ScopeKind.Type);
             base.Visit(enumVariant);
             this.PopScope();
             return this.Default;
@@ -210,7 +220,7 @@ public static class SymbolResolution
 
         protected override object Visit(Expr.Block block)
         {
-            this.PushScope();
+            this.PushScope(ScopeKind.Local);
             base.Visit(block);
             this.PopScope();
             return this.Default;
@@ -218,7 +228,7 @@ public static class SymbolResolution
 
         protected override object Visit(Expr.For @for)
         {
-            this.PushScope();
+            this.PushScope(ScopeKind.Local);
             base.Visit(@for);
             this.PopScope();
             return this.Default;
@@ -230,7 +240,7 @@ public static class SymbolResolution
             // Each arm gets a scope
             foreach (var arm in match.Arms)
             {
-                this.PushScope();
+                this.PushScope(ScopeKind.Local);
                 this.Visit(arm);
                 this.PopScope();
             }
