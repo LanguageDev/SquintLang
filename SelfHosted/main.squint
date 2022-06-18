@@ -2,8 +2,19 @@ import System.Console.WriteLine;
 
 type Lexer(val Text: string, var Offset: int);
 
+#[derive(Equatable, ToString)]
+type Span(val From: int, val To: int);
+
+#[derive(Equatable, ToString)]
+type TokenType =
+    | End
+    | Unknown
+    | Identifier
+    | LiteralInt
+    ;
+
 #[derive(ToString)]
-type Token(val Text: string);
+type Token(val Text: string, val Kind: TokenType, val Span: Span);
 
 impl Lexer {
     // NOTE: Named arguments would be really nice here
@@ -22,17 +33,17 @@ impl Lexer {
         }
 
         func skip() = start = this.Offset;
-        func take(): string {
-            var text = this.Text.Substring(start, this.Offset - start);
-            start = this.Offset;
-            return text;
+        func take(ty: TokenType): string {
+            val text = this.Text.Substring(start, this.Offset - start);
+            val span = Span(start, this.Offset);
+            return Token(text, ty, span);
         }
 
         func is_ident(ch: char): bool = char.IsLetterOrDigit(ch) or ch == '_';
 
     begin:
         // EOF
-        if is_end() then return Token("<EOF>");
+        if is_end() then return take(TokenType.End);
 
         // Space
         if char.IsWhiteSpace(current()) then {
@@ -43,24 +54,24 @@ impl Lexer {
         // Integer literal
         if char.IsDigit(current()) then {
             consume_while(char.IsDigit);
-            return Token(take());
+            return take(TokenType.LiteralInt);
         }
         // Identifier
         if is_ident(current()) then {
             consume_while(is_ident);
-            return Token(take());
+            return take(TokenType.Identifier);
         }
         // Unknown
         step();
-        return Token(take());
+        return take(TokenType.Unknown);
     }
 }
 
 func main() {
     val lexer = Lexer.new("hello world 123 hi_3");
     while true do {
-        var token = lexer.next();
+        val token = lexer.next();
         WriteLine(token);
-        if token.Text == "<EOF>" then goto break;
+        if token.Kind.Equals(TokenType.End) then goto break;
     }
 }

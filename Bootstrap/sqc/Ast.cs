@@ -168,7 +168,11 @@ public static class AstConverter
         SquintParser.Record_type_declarationContext rec => new Decl.Record(
             rec.name().GetText(),
             ToGenerics(rec.generic_param_list()),
-            rec.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList())
+            rec .type_declaration_member_list()?
+                .type_declaration_member()
+                .Select(ToDecl)
+                .Cast<Decl.TypeMember>()
+                .ToImmutableList() ?? ImmutableList<Decl.TypeMember>.Empty)
             {
                 Attributes = ToAttributeList(rec.attribute_list()),
             },
@@ -181,7 +185,11 @@ public static class AstConverter
             }),
         SquintParser.Du_type_ctorContext ctor => new Decl.EnumVariant(
             ctor.name().GetText(),
-            ctor.type_declaration_member_list().type_declaration_member().Select(ToDecl).Cast<Decl.TypeMember>().ToImmutableList())
+            ctor.type_declaration_member_list()?
+                .type_declaration_member()
+                .Select(ToDecl)
+                .Cast<Decl.TypeMember>()
+                .ToImmutableList() ?? ImmutableList<Decl.TypeMember>.Empty)
             {
                 Attributes = ToAttributeList(ctor.attribute_list()),
             },
