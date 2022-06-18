@@ -19,6 +19,7 @@ public enum SymbolKind
     Local,
     Global,
     Namespace,
+    Label,
 }
 
 public enum ScopeKind
@@ -218,6 +219,13 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Stmt.Label label)
+        {
+            label.Symbol = new(label.Name, SymbolKind.Label);
+            label.Scope!.Define(label.Symbol);
+            return this.Default;
+        }
+
         protected override object Visit(Expr.Block block)
         {
             this.PushScope(ScopeKind.Local);
@@ -350,6 +358,12 @@ public static class SymbolResolution
                 var.Symbol = new(var.Name, SymbolKind.Local);
                 var.Scope!.Define(var.Symbol);
             }
+            return this.Default;
+        }
+
+        protected override object Visit(Stmt.Goto @goto)
+        {
+            @goto.Symbol = @goto.Scope!.Reference(@goto.Name);
             return this.Default;
         }
 

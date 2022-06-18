@@ -366,6 +366,18 @@ public static class Globals
         return this.Default;
     }
 
+    protected override string Visit(Stmt.Label label)
+    {
+        this.CodeBuilder.AppendLine($"{this.GetLocalName(label.Symbol!)}:");
+        return this.Default;
+    }
+
+    protected override string Visit(Stmt.Goto @goto)
+    {
+        this.CodeBuilder.AppendLine($"goto {this.GetLocalName(@goto.Symbol!)};");
+        return this.Default;
+    }
+
     protected override string Visit(Expr.Block block)
     {
         foreach (var s in block.Stmts) this.Visit(s);

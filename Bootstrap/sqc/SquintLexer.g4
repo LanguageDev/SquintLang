@@ -52,6 +52,7 @@ KW_TYPE : 'type' ;
 KW_TRAIT : 'trait' ;
 KW_THIS : 'this' ;
 KW_RETURN : 'return' ;
+KW_GOTO : 'goto' ;
 KW_FOR : 'for' ;
 KW_IMPL : 'impl' ;
 KW_IF : 'if' ;

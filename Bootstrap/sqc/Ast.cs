@@ -41,6 +41,14 @@ public abstract record class Ast
 public abstract record class Stmt : Ast
 {
     public sealed record class Return(Expr? Value) : Stmt;
+    public sealed record class Goto(string Name) : Stmt
+    {
+        public Symbol? Symbol { get; set; }
+    }
+    public sealed record class Label(string Name) : Stmt
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Exp(Expr Expr) : Stmt;
 }
 
@@ -240,6 +248,8 @@ public static class AstConverter
         SquintParser.Match_statementContext m => new Stmt.Exp(new Expr.Match(
             ToExpr(m.expression()),
             m.match_statement_arm().Select(ToExpr).Cast<Expr.MatchArm>().ToImmutableList())),
+        SquintParser.Label_statementContext l => new Stmt.Label(l.name().GetText()),
+        SquintParser.Goto_statementContext g => new Stmt.Goto(g.name().GetText()),
         _ => throw new NotImplementedException(),
     };
 
@@ -421,6 +431,8 @@ public abstract class AstVisitor<TResult>
         Decl v => this.Visit(v),
         Stmt.Exp v => this.Visit(v),
         Stmt.Return v => this.Visit(v),
+        Stmt.Label v => this.Visit(v),
+        Stmt.Goto v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -553,6 +565,9 @@ public abstract class AstVisitor<TResult>
         this.VisitOpt(@return.Value);
         return this.Default;
     }
+
+    protected virtual TResult Visit(Stmt.Label label) => this.Default;
+    protected virtual TResult Visit(Stmt.Goto @goto) => this.Default;
 
     protected virtual TResult Visit(Stmt.Exp exp)
     {
@@ -712,6 +727,8 @@ public abstract class AstTransformer
         Decl v => this.Transform(v),
         Stmt.Exp v => this.Transform(v),
         Stmt.Return v => this.Transform(v),
+        Stmt.Label v => this.Transform(v),
+        Stmt.Goto v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -813,6 +830,9 @@ public abstract class AstTransformer
         new Decl.Var(var.Mutable, var.Name, this.TransformOpt(var.Type), this.TransformOpt(var.Value));
 
     public virtual Stmt Transform(Stmt.Return @return) => new Stmt.Return(this.TransformOpt(@return.Value));
+
+    public virtual Stmt Transform(Stmt.Label label) => new Stmt.Label(label.Name);
+    public virtual Stmt Transform(Stmt.Goto @goto) => new Stmt.Goto(@goto.Name);
 
     public virtual Stmt Transform(Stmt.Exp exp) => new Stmt.Exp(this.Transform(exp.Expr));
 

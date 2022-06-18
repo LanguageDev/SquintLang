@@ -67,6 +67,8 @@ statement : 'return' value=expression? ';' # return_statement
           | for_statement                  # keep_statement
           | block_statement                # keep_statement
           | match_statement                # keep_statement
+          | name ':'                       # label_statement
+          | 'goto' name ';'                # goto_statement
           | expression ';'                 # expression_statement
           ;
 
