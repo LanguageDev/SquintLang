@@ -458,6 +458,7 @@ public abstract class AstVisitor<TResult>
         Expr.Name v => this.Visit(v),
         Expr.Block v => this.Visit(v),
         Expr.Call v => this.Visit(v),
+        Expr.Ury v => this.Visit(v),
         Expr.Bin v => this.Visit(v),
         Expr.Rel v => this.Visit(v),
         Expr.Lit v => this.Visit(v),
@@ -595,6 +596,12 @@ public abstract class AstVisitor<TResult>
     {
         this.Visit(call.Called);
         this.VisitAll(call.Args);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Expr.Ury ury)
+    {
+        this.Visit(ury.Subexpr);
         return this.Default;
     }
 
@@ -753,6 +760,7 @@ public abstract class AstTransformer
         Expr.Name v => this.Transform(v),
         Expr.Block v => this.Transform(v),
         Expr.Call v => this.Transform(v),
+        Expr.Ury v => this.Transform(v),
         Expr.Bin v => this.Transform(v),
         Expr.Rel v => this.Transform(v),
         Expr.Lit v => this.Transform(v),
@@ -853,7 +861,11 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.Call call) => new Expr.Call(
         this.Transform(call.Called),
         this.TransformAll(call.Args));
-    
+
+    public virtual Expr Transform(Expr.Ury ury) => new Expr.Ury(
+        ury.Op,
+        this.Transform(ury.Subexpr));
+
     public virtual Expr Transform(Expr.Bin bin) => new Expr.Bin(
         bin.Op,
         this.Transform(bin.Left),

@@ -531,6 +531,21 @@ public static class Globals
         return res;
     }
 
+    protected override string Visit(Expr.Ury ury)
+    {
+        var res = this.TmpName();
+        var op = ury.Op switch
+        {
+            "not" => "!",
+            _ => ury.Op,
+        };
+
+        var sub = this.Visit(ury.Subexpr);
+        this.CodeBuilder.AppendLine($"var {res} = {op}{sub};");
+
+        return res;
+    }
+
     protected override string Visit(Expr.Bin bin)
     {
         var res = this.TmpName();
