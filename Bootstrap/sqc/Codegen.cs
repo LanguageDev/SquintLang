@@ -751,4 +751,13 @@ public static class Globals
 
         return res;
     }
+
+    protected override string Visit(Expr.Cast cast)
+    {
+        var res = this.TmpName();
+        var value = this.Visit(cast.Value);
+        var targetTy = this.GetTypeString(cast.TargetType);
+        this.CodeBuilder.AppendLine($"var {res} = ({targetTy}){value};");
+        return res;
+    }
 }

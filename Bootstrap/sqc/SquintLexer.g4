@@ -62,6 +62,7 @@ KW_WHILE : 'while' ;
 KW_DO : 'do' ;
 KW_MATCH : 'match' ;
 KW_WITH : 'with' ;
+KW_CAST : 'cast' ;
 KW_IN : 'in' ;
 KW_TRUE : 'true' ;
 KW_FALSE : 'false' ;

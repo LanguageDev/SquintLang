@@ -74,6 +74,7 @@ statement : 'return' value=expression? ';' # return_statement
 
 expression : atom_expression                                                 # wrapped_expression
            | '(' expression ')'                                              # grouping_expression
+           | expression '.' 'cast' '(' type ')'                              # cast_expression
            | obj=expression '.' member=name '(' args=expression_list ')'     # member_call_expression
            | obj=expression '.' member=name                                  # member_access_expression
            | array=expression '[' indices=expression_list ']'                # index_expression
