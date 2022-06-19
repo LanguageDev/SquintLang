@@ -2,10 +2,12 @@
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "Squint",
 	"patterns": [
-        { "include": "#keywords" },
 		{ "include": "#line_comment" },
+        { "include": "#keywords" },
+        { "include": "#operators" },
 		{ "include": "#builtin_types" },
 		{ "include": "#strings" },
+		{ "include": "#char_literals" },
 		{ "include": "#integer_literals" },
 		{ "include": "#boolean_constants" },
 		{ "include": "#identifiers" }
@@ -19,9 +21,15 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.squint",
-				"match": "\\b(import|if|then|else|while|do|for|return|match|with|func|type|var|val|trait|impl|this|in|and|or|not|goto|break|continue|cast)\\b"
+				"match": "\\b(import|if|then|else|while|do|for|return|match|with|func|type|var|val|trait|impl|this|in|goto|break|continue)\\b"
 			}]
 		},
+        "operators": {
+            "patterns": [{
+                "name": "keyword.operator.squint",
+                "match": "\\b(\\+|-|\\*|\\/|\\+=|-=|\\*=|\\/=|>|<|>=|<=|==|!=|and|or|not|cast)\\b"
+            }]
+        },
         "builtin_types": {
 			"patterns": [{
 				"name": "storage.type.squint",
@@ -39,6 +47,17 @@
 				}
 			]
 		},
+        "char_literals": {
+            "name": "constant.character.squint",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.squint",
+					"match": "\\\\."
+				}
+			]
+        },
         "integer_literals": {
 			"name": "constant.numeric.integer.decimal.squint",
       		"match": "\\b[0-9]+\\b"

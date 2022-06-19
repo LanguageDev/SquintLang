@@ -1,5 +1,55 @@
 import System.Console;
+import System.Collections.Generic.List[T];
+import System.Linq.Enumerable.Range;
+
+func execute(program: string) {
+    val memory = List[uint8]();
+    // Fill memory with 65565 0s
+    for i in Range(0, 65565) do memory.Add(0);
+
+    // Run the program
+    var ins_ptr = 0;
+    var mem_ptr = 0;
+    while ins_ptr < program.Length do {
+        match program[ins_ptr] with {
+            | '>' -> mem_ptr += 1;
+            | '<' -> mem_ptr -= 1;
+            | '+' -> memory[mem_ptr] += 1;
+            | '-' -> memory[mem_ptr] -= 1;
+            | '.' -> Console.Write(memory[mem_ptr].cast(char));
+            | ',' -> memory[mem_ptr] = Console.In.Read().cast(uint8);
+            | '[' -> {
+                if memory[mem_ptr] == 0 then {
+                    var loop_count = 1;
+                    while loop_count > 0 do {
+                        ins_ptr += 1;
+                        match program[ins_ptr] with {
+                            | '[' -> loop_count += 1;
+                            | ']' -> loop_count -= 1;
+                            | _ -> {}
+                        }
+                    }
+                }
+            }
+            | ']' -> {
+                if memory[mem_ptr] != 0 then {
+                    var loop_count = 1;
+                    while loop_count > 0 do {
+                        ins_ptr -= 1;
+                        match program[ins_ptr] with {
+                            | ']' -> loop_count += 1;
+                            | '[' -> loop_count -= 1;
+                            | _ -> {}
+                        }
+                    }
+                }
+            }
+            | _ -> {}
+        }
+        ins_ptr += 1;
+    }
+}
 
 func main() {
-    // TODO: Need typecasting
+    execute("++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++++++..+++.>>.<-.<.+++.------.--------.>>+.>++.");
 }
