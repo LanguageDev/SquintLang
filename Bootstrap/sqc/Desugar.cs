@@ -13,7 +13,7 @@ namespace Squint.Compiler;
 
 public sealed class Desugar : AstTransformer
 {
-    private readonly record struct DeriveInfo(string TypeName, IEnumerable<string> MemberNames);
+    private readonly record struct DeriveInfo(string TypeName, IEnumerable<string> MemberNames, bool NeedsParens);
 
     public static Ast Trafo(Ast ast) => new Desugar().Transform(ast);
 
@@ -23,7 +23,10 @@ public sealed class Desugar : AstTransformer
     {
         record = (Decl.Record)base.Transform(record);
         
-        var derInfo = new DeriveInfo(record.Name, record.Members.Select(m => m.Name));
+        var derInfo = new DeriveInfo(
+            TypeName: record.Name,
+            MemberNames: record.Members?.Select(m => m.Name) ?? Enumerable.Empty<string>(),
+            NeedsParens: record.Members is not null);
         return ApplyDerives(record, derInfo);
     }
 
@@ -47,7 +50,10 @@ public sealed class Desugar : AstTransformer
 
         // Go through each derive argument
         var fullName = $"{parent.Name}.{enumVariant.Name}";
-        var derInfo = new DeriveInfo(fullName, enumVariant.Members.Select(m => m.Name));
+        var derInfo = new DeriveInfo(
+            fullName,
+            enumVariant.Members?.Select(m => m.Name) ?? Enumerable.Empty<string>(),
+            NeedsParens: enumVariant.Members is not null);
         return ApplyDerives(enumVariant, derInfo);
     }
 
@@ -95,9 +101,10 @@ impl {target.TypeName} {{
     #[override]
     func ToString(this): string {{
         var sb = System.Text.StringBuilder();
-        sb.Append(""{target.TypeName}("");
+        sb.Append(""{target.TypeName}"");
+        {(target.NeedsParens ? "sb.Append('(');" : "")}
         {string.Join("sb.Append(\", \");", target.MemberNames.Select(m => $"sb.Append(this.{m}.ToString());"))}
-        sb.Append("")"");
+        {(target.NeedsParens ? "sb.Append(')');" : "")}
         return sb.ToString();
     }}
 }}

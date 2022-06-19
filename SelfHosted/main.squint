@@ -33,7 +33,7 @@ impl Lexer {
         }
 
         func skip() = start = this.Offset;
-        func take(ty: TokenType): string {
+        func take(ty: TokenType): Token {
             val text = this.Text.Substring(start, this.Offset - start);
             val span = Span(start, this.Offset);
             return Token(text, ty, span);

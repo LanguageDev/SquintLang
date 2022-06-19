@@ -204,12 +204,21 @@ public static class Globals
         _ => throw new NotImplementedException(),
     };
 
-    private bool IsType(Expr expr) => expr switch
+    private bool IsType(Expr expr) => this.GetTypeSymbol(expr) is not null;
+
+    private Symbol? GetTypeSymbol(Expr expr)
     {
-        Expr.Name name => name.Symbol!.Kind == SymbolKind.Type,
-        Expr.Index i => this.IsType(i.Indexed) && i.Indices.All(this.IsType),
-        _ => false,
-    };
+        if (expr is Expr.Name name && name.Symbol!.Kind == SymbolKind.Type) return name.Symbol!;
+        if (expr is Expr.Index i && i.Indices.All(this.IsType)) return this.GetTypeSymbol(i.Indexed);
+        if (expr is Expr.MemberAccess m)
+        {
+            var parent = this.GetTypeSymbol(m.Instance);
+            if (parent is null) return null;
+            var tyName = $"{parent.Name}.{m.Member}";
+            return m.Scope!.ReferenceOpt(tyName);
+        }
+        return null;
+    }
 
     private string TranslatePattern(Pattern p, string parent)
     {
@@ -291,10 +300,13 @@ public static class Globals
         builder.Bases.Insert(0, baseBuilder.Name);
 
         // Properties
-        foreach (var m in enumVariant.Members)
+        if (enumVariant.Members is not null)
         {
-            var ty = this.GetTypeString(m.Type);
-            builder.Properties.Add(new(ty, m.Name, m.Mutable));
+            foreach (var m in enumVariant.Members)
+            {
+                var ty = this.GetTypeString(m.Type);
+                builder.Properties.Add(new(ty, m.Name, m.Mutable));
+            }
         }
 
         return this.Default;
@@ -697,8 +709,21 @@ public static class Globals
 
     protected override string Visit(Expr.This @this) => "this";
 
-    protected override string Visit(Expr.MemberAccess memberAccess) =>
-        $"{this.Visit(memberAccess.Instance)}.{EscapeKeyword(memberAccess.Member)}";
+    protected override string Visit(Expr.MemberAccess memberAccess)
+    {
+        var typeSym = this.GetTypeSymbol(memberAccess);
+        if (typeSym is not null && typeSym.IsArgless)
+        {
+            // Parameterless ctor
+            var res = this.TmpName();
+            this.CodeBuilder.Append($"var {res} = new {this.GetTypeString(memberAccess)}();");
+            return res;
+        }
+        else
+        {
+            return $"{this.Visit(memberAccess.Instance)}.{EscapeKeyword(memberAccess.Member)}";
+        }
+    }
 
     protected override string Visit(Expr.MemberCall memberCall)
     {

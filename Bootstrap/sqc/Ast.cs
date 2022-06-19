@@ -78,7 +78,7 @@ public abstract record class Decl : Stmt
     public sealed record class Record(
         string Name,
         ImmutableList<GenericParam> Generics,
-        ImmutableList<TypeMember> Members) : Decl
+        ImmutableList<TypeMember>? Members) : Decl
     {
         public Symbol? Symbol { get; set; }
     }
@@ -91,7 +91,7 @@ public abstract record class Decl : Stmt
     }
     public sealed record class EnumVariant(
         string Name,
-        ImmutableList<TypeMember> Members) : Decl
+        ImmutableList<TypeMember>? Members) : Decl
     {
         public Enum? Parent { get; set; }
         public Symbol? Symbol { get; set; }
@@ -175,7 +175,7 @@ public static class AstConverter
                 .type_declaration_member()
                 .Select(ToDecl)
                 .Cast<Decl.TypeMember>()
-                .ToImmutableList() ?? ImmutableList<Decl.TypeMember>.Empty)
+                .ToImmutableList())
             {
                 Attributes = ToAttributeList(rec.attribute_list()),
             },
@@ -192,7 +192,7 @@ public static class AstConverter
                 .type_declaration_member()
                 .Select(ToDecl)
                 .Cast<Decl.TypeMember>()
-                .ToImmutableList() ?? ImmutableList<Decl.TypeMember>.Empty)
+                .ToImmutableList())
             {
                 Attributes = ToAttributeList(ctor.attribute_list()),
             },
@@ -514,7 +514,7 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Decl.Record record)
     {
         this.VisitAll(record.Generics);
-        this.VisitAll(record.Members);
+        if (record.Members is not null) this.VisitAll(record.Members);
         return this.Default;
     }
 
@@ -527,7 +527,7 @@ public abstract class AstVisitor<TResult>
 
     protected virtual TResult Visit(Decl.EnumVariant enumVariant)
     {
-        this.VisitAll(enumVariant.Members);
+        if (enumVariant.Members is not null) this.VisitAll(enumVariant.Members);
         return this.Default;
     }
 
@@ -808,7 +808,9 @@ public abstract class AstTransformer
     public virtual Decl Transform(Decl.Record record) => KeepAttr(record, new Decl.Record(
         record.Name,
         this.TransformAll(record.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
-        this.TransformAll(record.Members).Cast<Decl.TypeMember>().ToImmutableList()));
+        record.Members is null
+            ? null
+            : this.TransformAll(record.Members).Cast<Decl.TypeMember>().ToImmutableList()));
 
     public virtual Decl Transform(Decl.Enum @enum)
     {
@@ -824,7 +826,9 @@ public abstract class AstTransformer
 
     public virtual Decl Transform(Decl.EnumVariant enumVariant) => KeepAttr(enumVariant, new Decl.EnumVariant(
         enumVariant.Name,
-        this.TransformAll(enumVariant.Members).Cast<Decl.TypeMember>().ToImmutableList()));
+        enumVariant.Members is null
+            ? null
+            : this.TransformAll(enumVariant.Members).Cast<Decl.TypeMember>().ToImmutableList()));
 
     public virtual Decl Transform(Decl.TypeMember typeMember) =>
         new Decl.TypeMember(typeMember.Mutable, typeMember.Name, this.Transform(typeMember.Type));

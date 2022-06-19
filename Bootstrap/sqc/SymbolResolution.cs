@@ -35,6 +35,7 @@ public sealed record class Symbol(string Name, SymbolKind Kind)
 {
     public object UniqueKey { get; set; } = new();
     public string FullName { get; init; } = Name;
+    public bool IsArgless { get; init; } = false;
     public Symbol? Supertype { get; set; }
 }
 
@@ -196,6 +197,7 @@ public static class SymbolResolution
             {
                 FullName = $"{enumVariant.Parent!.Symbol!.FullName}.{enumVariant.Name}",
                 Supertype = enumVariant.Parent!.Symbol,
+                IsArgless = enumVariant.Members is null,
             };
             this.currentScope.Define(enumVariant.Symbol);
 
