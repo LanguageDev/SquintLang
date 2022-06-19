@@ -81,7 +81,9 @@ impl {target.TypeName} {{
 }}
 impl System.IEquatable[{target.TypeName}] for {target.TypeName} {{
     func Equals(this, other: {target.TypeName}): bool =
-        {string.Join(" and ", target.MemberNames.Select(m => $"this.{m}.Equals(other.{m})"))};
+        {(target.MemberNames.Any()
+            ? string.Join(" and ", target.MemberNames.Select(m => $"this.{m}.Equals(other.{m})"))
+            : "true")};
 }}
 "),
 
