@@ -149,6 +149,21 @@ public static class Globals
     private string TmpName() => $"_tmp_{this.tmpCount++}";
     private string LabelName() => $"_label_{this.labelCount++}";
 
+    private string GetLocalName(Symbol symbol)
+    {
+        if (!this.variables.TryGetValue(symbol, out var name))
+        {
+            name = $"_local_{this.variables.Count}";
+            this.variables.Add(symbol, name);
+        }
+        return name;
+    }
+
+    private static bool IsStoredValue(string name) =>
+           name.StartsWith("_tmp_")
+        || name.StartsWith("_label_")
+        || name.StartsWith("_local_");
+
     private static bool IsFunctionLocal(Scope scope) => scope.Kind switch
     {
         ScopeKind.Local => IsFunctionLocal(scope.Parent!),
@@ -163,16 +178,6 @@ public static class Globals
         "new" => "@new",
         _ => str,
     };
-
-    private string GetLocalName(Symbol symbol)
-    {
-        if (!this.variables.TryGetValue(symbol, out var name))
-        {
-            name = $"_local_{this.variables.Count}";
-            this.variables.Add(symbol, name);
-        }
-        return name;
-    }
 
     private TypeBuilder GetTypeBuilder(Symbol symbol)
     {
@@ -212,18 +217,25 @@ public static class Globals
         {
         case Pattern.Destructure d:
         {
-            var ty = d.NameSymbol!.FullName;
-            var boundName = this.TmpName();
-            var boundArgs = d.Args
-                .Select(a => (Pattern: a, Name: this.TmpName()))
-                .ToList();
-            var outArgs = string.Join(", ", boundArgs.Select(b => $"out var {b.Name}"));
-            var remPatterns = boundArgs
-                .Select(a => this.TranslatePattern(a.Pattern, a.Name))
-                .Where(a => !string.IsNullOrWhiteSpace(a))
-                .ToList();
-            var remPattern = string.Join("", remPatterns.Select(p => $" && {p}"));
-            return $"({parent} is {ty} {boundName} && {boundName}.Deconstruct({outArgs}){remPattern})";
+            var ty = this.GetTypeString(d.Type);
+            var boundName = d.BoundName is null
+                ? this.TmpName()
+                : this.GetLocalName(d.BoundSymbol!);
+            var result = $"({parent} is {ty} {boundName})";
+            if (d.Args is not null && d.Args.Count > 0)
+            {
+                var boundArgs = d.Args
+                    .Select(a => (Pattern: a, Name: this.TmpName()))
+                    .ToList();
+                var outArgs = string.Join(", ", boundArgs.Select(b => $"out var {b.Name}"));
+                var remPatterns = boundArgs
+                    .Select(a => this.TranslatePattern(a.Pattern, a.Name))
+                    .Where(a => !string.IsNullOrWhiteSpace(a))
+                    .ToList();
+                var remPattern = string.Join("", remPatterns.Select(p => $" && {p}"));
+                result = $"({result} && {boundName}.Deconstruct({outArgs}) {remPattern})";
+            }
+            return result;
         }
 
         case Pattern.Name n:
@@ -487,7 +499,10 @@ public static class Globals
         // End label
         this.CodeBuilder.AppendLine($"{endLabel}:");
         // We convince the compiler that everything is properly initialized
-        foreach (var r in armResults) this.CodeBuilder.AppendLine($"System.Runtime.CompilerServices.Unsafe.SkipInit(out {r});");
+        foreach (var r in armResults.Where(IsStoredValue))
+        {
+            this.CodeBuilder.AppendLine($"System.Runtime.CompilerServices.Unsafe.SkipInit(out {r});");
+        }
         // Assign result value
         this.CodeBuilder
             .AppendLine($"var {res} = {choiceVar} switch")

@@ -90,7 +90,6 @@ public static class SymbolResolution
 
         private readonly Scope globalScope;
         private Scope currentScope;
-        private int labelCount = 0;
 
         public Pass1()
         {
@@ -103,6 +102,7 @@ public static class SymbolResolution
                     FullName = realName ?? name,
                 });
 
+            DefineBuiltinType("object");
             DefineBuiltinType("string");
             DefineBuiltinType("char");
             DefineBuiltinType("int");
@@ -419,7 +419,12 @@ public static class SymbolResolution
         protected override object Visit(Pattern.Destructure destructure)
         {
             base.Visit(destructure);
-            destructure.NameSymbol = destructure.Scope!.Reference(destructure.Name_);
+            if (destructure.BoundName is not null)
+            {
+                // Bound to a name, register it
+                destructure.BoundSymbol = new(destructure.BoundName, SymbolKind.Local);
+                destructure.Scope!.Define(destructure.BoundSymbol);
+            }
             return this.Default;
         }
     }

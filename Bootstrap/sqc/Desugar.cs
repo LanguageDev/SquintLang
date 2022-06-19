@@ -67,10 +67,13 @@ public sealed class Desugar : AstTransformer
 
     private static Decl ImplementDerive(DeriveInfo target, Expr der) => der switch
     {
-        // TODO: object equality? (we need casting for equality)
         Expr.Name name when name.Value == "Equatable" => (Decl)Ast.Parse($@"
 impl {target.TypeName} {{
-    // TODO: Equals(object?)
+    #[override]
+    func Equals(this, other: object): bool = match other with
+        | {target.TypeName} o -> this.Equals(o)
+        | _ -> false
+        ;
 
     #[override]
     func GetHashCode(this): int {{

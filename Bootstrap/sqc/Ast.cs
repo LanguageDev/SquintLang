@@ -140,9 +140,12 @@ public abstract record class Pattern : Ast
     {
         public Symbol? Symbol { get; set; }
     }
-    public sealed record class Destructure(string Name_, ImmutableList<Pattern> Args) : Pattern
+    public sealed record class Destructure(
+        Expr Type,
+        ImmutableList<Pattern>? Args,
+        string? BoundName) : Pattern
     {
-        public Symbol? NameSymbol { get; set; }
+        public Symbol? BoundSymbol { get; set; }
     }
     public sealed record class Literal(string Value) : Pattern;
     public sealed record class Discard : Pattern;
@@ -351,8 +354,9 @@ public static class AstConverter
     {
         SquintParser.Name_patternContext n => new Pattern.Name(n.name().GetText()),
         SquintParser.Destructure_patternContext d => new Pattern.Destructure(
-            string.Join('.', d.name().Select(n => n.GetText())),
-            d.pattern_list().pattern().Select(ToPattern).ToImmutableList()),
+            ToType(d.type()),
+            d.pattern_list()?.pattern().Select(ToPattern).ToImmutableList(),
+            d.name()?.GetText()),
         SquintParser.Literal_patternContext l => new Pattern.Literal(l.GetText()),
         SquintParser.Discard_patternContext => new Pattern.Discard(),
         _ => throw new NotImplementedException(),
@@ -696,7 +700,8 @@ public abstract class AstVisitor<TResult>
 
     protected virtual TResult Visit(Pattern.Destructure destructure)
     {
-        this.VisitAll(destructure.Args);
+        this.Visit(destructure.Type);
+        if (destructure.Args is not null) this.VisitAll(destructure.Args);
         return this.Default;
     }
 
@@ -927,8 +932,9 @@ public abstract class AstTransformer
     public virtual Pattern Transform(Pattern.Literal literal) => literal;
 
     public virtual Pattern Transform(Pattern.Destructure destructure) => new Pattern.Destructure(
-        destructure.Name_,
-        this.TransformAll(destructure.Args));
+        this.Transform(destructure.Type),
+        destructure.Args is null ? null : this.TransformAll(destructure.Args),
+        destructure.BoundName);
 
     private ImmutableList<Stmt> TransformAll(IEnumerable<Stmt> stmts) =>
         stmts.Select(this.Transform).ToImmutableList();
