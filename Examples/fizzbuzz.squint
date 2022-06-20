@@ -3,6 +3,7 @@ import System.Linq.Enumerable.Range;
 
 func main() {
     for (i in Range(1, 99)) {
+        // NOTE: Some tuple pattern matching would work great here
         if (i rem 3 == 0 and i rem 5 == 0) WriteLine("FizzBuzz");
         else if (i rem 3 == 0) WriteLine("Fizz");
         else if (i rem 5 == 0) WriteLine("Buzz");
