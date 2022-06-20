@@ -5,25 +5,25 @@ import System.Linq.Enumerable.Range;
 func execute(program: string) {
     val memory = List[uint8]();
     // Fill memory with 65565 0s
-    for i in Range(0, 65565) do memory.Add(0);
+    for (i in Range(0, 65565)) memory.Add(0);
 
     // Run the program
     var ins_ptr = 0;
     var mem_ptr = 0;
-    while ins_ptr < program.Length do {
-        match program[ins_ptr] with {
+    while (ins_ptr < program.Length) {
+        match (program[ins_ptr]) {
             | '>' -> mem_ptr += 1;
             | '<' -> mem_ptr -= 1;
             | '+' -> memory[mem_ptr] += 1;
             | '-' -> memory[mem_ptr] -= 1;
-            | '.' -> Console.Write(memory[mem_ptr].cast(char));
-            | ',' -> memory[mem_ptr] = Console.In.Read().cast(uint8);
+            | '.' -> Console.Write(memory[mem_ptr].cast[char]);
+            | ',' -> memory[mem_ptr] = Console.In.Read().cast[uint8];
             | '[' -> {
-                if memory[mem_ptr] == 0 then {
+                if (memory[mem_ptr] == 0) {
                     var loop_count = 1;
-                    while loop_count > 0 do {
+                    while (loop_count > 0) {
                         ins_ptr += 1;
-                        match program[ins_ptr] with {
+                        match (program[ins_ptr]) {
                             | '[' -> loop_count += 1;
                             | ']' -> loop_count -= 1;
                             | _ -> {}
@@ -32,11 +32,11 @@ func execute(program: string) {
                 }
             }
             | ']' -> {
-                if memory[mem_ptr] != 0 then {
+                if (memory[mem_ptr] != 0) {
                     var loop_count = 1;
-                    while loop_count > 0 do {
+                    while (loop_count > 0) {
                         ins_ptr -= 1;
-                        match program[ins_ptr] with {
+                        match (program[ins_ptr]) {
                             | ']' -> loop_count += 1;
                             | '[' -> loop_count -= 1;
                             | _ -> {}

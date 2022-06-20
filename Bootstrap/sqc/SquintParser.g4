@@ -74,7 +74,7 @@ statement : 'return' value=expression? ';' # return_statement
 
 expression : atom_expression                                                 # wrapped_expression
            | '(' expression ')'                                              # grouping_expression
-           | expression '.' 'cast' '(' type ')'                              # cast_expression
+           | expression '.' 'cast' '[' type ']'                              # cast_expression
            | obj=expression '.' member=name '(' args=expression_list ')'     # member_call_expression
            | obj=expression '.' member=name                                  # member_access_expression
            | array=expression '[' indices=expression_list ']'                # index_expression
@@ -118,23 +118,23 @@ array_expression : '[' expression_list ']' ;
 block_expression : OPEN_BRACE statement* expression? CLOSE_BRACE ;
 block_statement  : OPEN_BRACE statement* CLOSE_BRACE ;
 
-if_expression : 'if' condition=expression 'then' then=expression 'else' els=expression
-              | 'if' condition=expression 'then' then=expression
+if_expression : 'if' '(' condition=expression ')' then=expression 'else' els=expression
+              | 'if' '(' condition=expression ')' then=expression
               ;
-if_statement  : 'if' condition=expression 'then' then=statement 'else' els=statement
-              | 'if' condition=expression 'then' then=statement
+if_statement  : 'if' '(' condition=expression ')' then=statement 'else' els=statement
+              | 'if' '(' condition=expression ')' then=statement
               ;
 
-while_expression : 'while' condition=expression 'do' body=expression ;
-while_statement  : 'while' condition=expression 'do' body=statement ;
+while_expression : 'while' '(' condition=expression ')' body=expression ;
+while_statement  : 'while' '(' condition=expression ')' body=statement ;
 
-for_expression : 'for' iterator=name 'in' iterable=expression 'do' body=expression ;
-for_statement  : 'for' iterator=name 'in' iterable=expression 'do' body=statement ;
+for_expression : 'for' '(' iterator=name 'in' iterable=expression ')' body=expression ;
+for_statement  : 'for' '(' iterator=name 'in' iterable=expression ')' body=statement ;
 
-match_expression : 'match' expression 'with' '{' ('|'? match_expression_arm ('|' match_expression_arm)*)? '}' ;
+match_expression : 'match' '(' expression ')' '{' ('|'? match_expression_arm ('|' match_expression_arm)*)? '}' ;
 match_expression_arm : pattern '->' expression ;
 
-match_statement : 'match' expression 'with' '{' ('|'? match_statement_arm ('|' match_statement_arm)*)? '}' ;
+match_statement : 'match' '(' expression ')' '{' ('|'? match_statement_arm ('|' match_statement_arm)*)? '}' ;
 match_statement_arm : pattern '->' statement ;
 
 pattern : '_'                                # discard_pattern

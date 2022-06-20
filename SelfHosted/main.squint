@@ -29,7 +29,7 @@ impl Lexer {
         func step() = this.Offset += 1;
 
         func consume_while(pred: (char) -> bool) {
-            while not is_end() and pred(current()) do step();
+            while (not is_end() and pred(current())) step();
         }
 
         func skip() = start = this.Offset;
@@ -43,21 +43,21 @@ impl Lexer {
 
     begin:
         // EOF
-        if is_end() then return take(TokenType.End);
+        if (is_end()) return take(TokenType.End);
 
         // Space
-        if char.IsWhiteSpace(current()) then {
+        if (char.IsWhiteSpace(current())) {
             consume_while(char.IsWhiteSpace);
             skip();
             goto begin;
         }
         // Integer literal
-        if char.IsDigit(current()) then {
+        if (char.IsDigit(current())) {
             consume_while(char.IsDigit);
             return take(TokenType.LiteralInt);
         }
         // Identifier
-        if is_ident(current()) then {
+        if (is_ident(current())) {
             consume_while(is_ident);
             return take(TokenType.Identifier);
         }
@@ -69,9 +69,9 @@ impl Lexer {
 
 func main() {
     val lexer = Lexer.new("hello world 123 hi_3");
-    while true do {
+    while (true) {
         val token = lexer.next();
         WriteLine(token);
-        if token.Kind.Equals(TokenType.End) then goto break;
+        if (token.Kind.Equals(TokenType.End)) goto break;
     }
 }
