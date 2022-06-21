@@ -137,6 +137,7 @@ public abstract record class Expr : Ast
     public sealed record class MatchArm(Pattern Pattern, Expr Value) : Expr;
     public sealed record class FuncType(ImmutableList<Expr> Params, Expr Return) : Expr;
     public sealed record class Cast(Expr Value, Expr TargetType) : Expr;
+    public sealed record class Throw(Expr Value) : Expr;
 }
 
 public abstract record class Pattern : Ast
@@ -344,6 +345,7 @@ public static class AstConverter
         SquintParser.Cast_expressionContext c => new Expr.Cast(
             ToExpr(c.expression()),
             ToType(c.type())),
+        SquintParser.Throw_expressionContext t => new Expr.Throw(ToExpr(t.expression())),
         _ => throw new NotImplementedException(),
     };
 
@@ -499,6 +501,7 @@ public abstract class AstVisitor<TResult>
         Expr.MatchArm v => this.Visit(v),
         Expr.FuncType v => this.Visit(v),
         Expr.Cast v => this.Visit(v),
+        Expr.Throw v => this.Visit(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -721,6 +724,12 @@ public abstract class AstVisitor<TResult>
         return this.Default;
     }
 
+    protected virtual TResult Visit(Expr.Throw @throw)
+    {
+        this.Visit(@throw.Value);
+        return this.Default;
+    }
+
     protected virtual TResult Visit(Pattern.Name name) => this.Default;
     protected virtual TResult Visit(Pattern.Discard discard) => this.Default;
     protected virtual TResult Visit(Pattern.Literal literal) => this.Default;
@@ -817,6 +826,7 @@ public abstract class AstTransformer
         Expr.MatchArm v => this.Transform(v),
         Expr.FuncType v => this.Transform(v),
         Expr.Cast v => this.Transform(v),
+        Expr.Throw v => this.Transform(v),
         _ => throw new NotImplementedException(),
     };
 
@@ -967,6 +977,9 @@ public abstract class AstTransformer
     public virtual Expr Transform(Expr.Cast cast) => new Expr.Cast(
         this.Transform(cast.Value),
         this.Transform(cast.TargetType));
+
+    public virtual Expr Transform(Expr.Throw @throw) => new Expr.Throw(
+        this.Transform(@throw.Value));
 
     public virtual Pattern Transform(Pattern.Name name) => name;
     public virtual Pattern Transform(Pattern.Discard discard) => discard;

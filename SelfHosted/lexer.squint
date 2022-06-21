@@ -1,4 +1,5 @@
 import System.Linq.Enumerable.Range;
+import System.NotImplementedException;
 
 #[derive(Equatable, ToString)]
 type Span(val From: int, val To: int);
@@ -51,14 +52,25 @@ type TokenType =
 #[derive(ToString)]
 type Token(val Text: string, val Kind: TokenType, val Span: Span);
 
-type Lexer(val Text: string, var Offset: int);
+#[derive(Equatable, ToString)]
+type LexerMode =
+    | Normal
+    | String
+    ;
+
+type Lexer(val Text: string, var Offset: int, var Mode: LexerMode);
 
 impl Lexer {
     // NOTE: Named arguments would be really nice here
     // Maybe Lexer(Text = text, Offset = 0) ?
-    func new(text: string): Lexer = Lexer(text, 0);
+    func new(text: string): Lexer = Lexer(text, 0, LexerMode.Normal);
 
-    func next(this): Token {
+    func next(this): Token = match (this.Mode) {
+    | LexerMode.Normal -> this.next_normal()
+    | _ -> throw NotImplementedException("Lexer mode ${this.Mode} is not supported!")
+    };
+
+    func next_normal(this): Token {
         var start = this.Offset;
 
         func is_end(): bool = this.Offset >= this.Text.Length;

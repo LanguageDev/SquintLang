@@ -63,6 +63,7 @@ KW_CAST : 'cast' ;
 KW_IN : 'in' ;
 KW_TRUE : 'true' ;
 KW_FALSE : 'false' ;
+KW_THROW : 'throw' ;
 
 // Literals
 DISCARD : '_' ;

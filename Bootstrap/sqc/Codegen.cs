@@ -458,6 +458,14 @@ public static class Globals
         return this.Default;
     }
 
+    protected override string Visit(Stmt.Exp exp)
+    {
+        // We need to still generate the expression, as it can contain side-effects
+        var value = this.Visit(exp.Expr);
+        this.CodeBuilder.AppendLine($"{DeVoid(value)};");
+        return this.Default;
+    }
+
     protected override string Visit(Expr.Block block)
     {
         foreach (var s in block.Stmts) this.Visit(s);
@@ -806,5 +814,12 @@ public static class Globals
         var targetTy = this.GetTypeString(cast.TargetType);
         this.CodeBuilder.AppendLine($"var {res} = ({targetTy}){value};");
         return res;
+    }
+
+    protected override string Visit(Expr.Throw @throw)
+    {
+        var value = this.Visit(@throw.Value);
+        this.CodeBuilder.AppendLine($"throw {value};");
+        return "default";
     }
 }

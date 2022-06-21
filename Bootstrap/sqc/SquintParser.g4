@@ -87,6 +87,7 @@ expression : atom_expression                                                 # w
            | left=expression op='and' right=expression                       # bin_expression
            | left=expression op='or' right=expression                        # bin_expression
            |<assoc=right> left=expression op=assign_op right=expression      # assign_expression
+           | 'throw' expression                                              # throw_expression
            ;
 rel_op : '>' | '<' | '>=' | '<=' | '==' | '!=' ;
 assign_op : '=' | '+=' | '-=' | '*=' | '/=' ;
