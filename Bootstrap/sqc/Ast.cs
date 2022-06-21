@@ -96,6 +96,10 @@ public abstract record class Decl : Stmt
         public Enum? Parent { get; set; }
         public Symbol? Symbol { get; set; }
     }
+    public sealed record class Trait(string Name, ImmutableList<Decl> Members) : Decl
+    {
+        public Symbol? Symbol { get; set; }
+    }
     public sealed record class Impl(
         Expr Target,
         Expr? Base,
@@ -233,6 +237,10 @@ public static class AstConverter
             v.name().GetText(),
             v.type() is null ? null : ToType(v.type()),
             v.expression() is null ? null : ToExpr(v.expression())),
+        SquintParser.Trait_declarationContext t => new Decl.Trait(
+            t.name().GetText(),
+            t.trait_member().Select(ToDecl).ToImmutableList()),
+        SquintParser.Trait_functionContext f => ToDecl(f.function_signature()),
         _ => throw new NotImplementedException(),
     };
 
@@ -460,6 +468,7 @@ public abstract class AstVisitor<TResult>
         Decl.Record v => this.Visit(v),
         Decl.Enum v => this.Visit(v),
         Decl.EnumVariant v => this.Visit(v),
+        Decl.Trait v => this.Visit(v),
         Decl.TypeMember v => this.Visit(v),
         Decl.Impl v => this.Visit(v),
         Decl.Func v => this.Visit(v),
@@ -533,6 +542,12 @@ public abstract class AstVisitor<TResult>
     protected virtual TResult Visit(Decl.EnumVariant enumVariant)
     {
         if (enumVariant.Members is not null) this.VisitAll(enumVariant.Members);
+        return this.Default;
+    }
+
+    protected virtual TResult Visit(Decl.Trait trait)
+    {
+        this.VisitAll(trait.Members);
         return this.Default;
     }
 
@@ -771,6 +786,7 @@ public abstract class AstTransformer
         Decl.Record v => this.Transform(v),
         Decl.Enum v => this.Transform(v),
         Decl.EnumVariant v => this.Transform(v),
+        Decl.Trait v => this.Transform(v),
         Decl.TypeMember v => this.Transform(v),
         Decl.Impl v => this.Transform(v),
         Decl.Func v => this.Transform(v),
@@ -842,6 +858,10 @@ public abstract class AstTransformer
         enumVariant.Members is null
             ? null
             : this.TransformAll(enumVariant.Members).Cast<Decl.TypeMember>().ToImmutableList()));
+
+    public virtual Decl Transform(Decl.Trait trait) => KeepAttr(trait, new Decl.Trait(
+        trait.Name,
+        this.TransformAll(trait.Members)));
 
     public virtual Decl Transform(Decl.TypeMember typeMember) =>
         new Decl.TypeMember(typeMember.Mutable, typeMember.Name, this.Transform(typeMember.Type));
