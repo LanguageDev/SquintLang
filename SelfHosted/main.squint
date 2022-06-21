@@ -4,12 +4,14 @@ import System.IO.File;
 func main() {
     var text = File.ReadAllText("lexer.squint");
     val lexer = Lexer.new(text);
+    var allCount = 0;
     var unknownCount = 0;
     while (true) {
+        allCount += 1;
         val token = lexer.next();
         WriteLine(token);
         if (token.Kind.Equals(TokenType.End)) goto break;
         if (token.Kind.Equals(TokenType.Unknown)) unknownCount += 1;
     }
-    WriteLine("$unknownCount unknown tokens");
+    WriteLine("$unknownCount unknown tokens out of $allCount tokens");
 }

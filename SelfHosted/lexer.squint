@@ -33,7 +33,7 @@ type TokenType =
 
     // Keywords
     | KwImport
-    | KwType | KwTrait | KwFunc | KwVar | KvVar
+    | KwType | KwTrait | KwFunc | KwVar | KwVal
     | KwIf | KwElse | KwFor | KwWhile | KwReturn | KwMatch | KwGoto
     | KwCast | KwThis | KwImpl
     | KwTrue | KwFalse
@@ -91,7 +91,6 @@ impl Lexer {
             return f;
         }
 
-    begin:
         // EOF
         if (is_end()) return take(TokenType.End);
 
@@ -105,6 +104,59 @@ impl Lexer {
         if (matches("//")) {
             consume_while(negate(is_end_of_line));
             return take(TokenType.LineComment);
+        }
+
+        // Two-character tokens are handled first, so one character tokens won't
+        // split them
+        if (matches("==")) return take(TokenType.OpEq);
+        if (matches("!=")) return take(TokenType.OpNeq);
+        if (matches(">=")) return take(TokenType.OpGte);
+        if (matches("<=")) return take(TokenType.OpLte);
+        if (matches("+=")) return take(TokenType.OpAddAsgn);
+        if (matches("-=")) return take(TokenType.OpSubAsgn);
+        if (matches("*=")) return take(TokenType.OpMulAsgn);
+        if (matches("/=")) return take(TokenType.OpDivAsgn);
+        if (matches("->")) return take(TokenType.Arrow);
+
+        // Integer literal
+        if (char.IsDigit(current())) {
+            consume_while(char.IsDigit);
+            return take(TokenType.LitInt);
+        }
+
+        // Identifier-like tokens
+        if (is_ident(current())) {
+            consume_while(is_ident);
+            val result = take(TokenType.Name);
+            val kind = match (result.Text) {
+            | "import" -> TokenType.KwImport
+            | "func" -> TokenType.KwFunc
+            | "var" -> TokenType.KwVar
+            | "val" -> TokenType.KwVal
+            | "type" -> TokenType.KwType
+            | "trait" -> TokenType.KwTrait
+            | "this" -> TokenType.KwThis
+            | "return" -> TokenType.KwReturn
+            | "goto" -> TokenType.KwGoto
+            | "for" -> TokenType.KwFor
+            | "impl" -> TokenType.KwImpl
+            | "if" -> TokenType.KwIf
+            | "else" -> TokenType.KwElse
+            | "while" -> TokenType.KwWhile
+            | "match" -> TokenType.KwMatch
+            | "cast" -> TokenType.KwCast
+            | "in" -> TokenType.KwIn
+            | "true" -> TokenType.KwTrue
+            | "false" -> TokenType.KwFalse
+            | "mod" -> TokenType.OpMod
+            | "rem" -> TokenType.OpRem
+            | "and" -> TokenType.OpAnd
+            | "or" -> TokenType.OpOr
+            | "not" -> TokenType.OpNot
+            | "_" -> TokenType.Discard
+            | _ -> TokenType.Name
+            };
+            return Token(result.Text, kind, result.Span);
         }
 
         // Unknown

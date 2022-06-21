@@ -758,7 +758,12 @@ public static class Globals
         {
             // Parameterless ctor
             var res = this.TmpName();
-            this.CodeBuilder.Append($"var {res} = new {this.GetTypeString(memberAccess)}();");
+            // If there is a supertype, upcast it for better type inference
+            var cast = typeSym.Supertype is null
+                ? ""
+                : $"({typeSym.Supertype.FullName})";
+            if (typeSym.Supertype is not null) 
+            this.CodeBuilder.Append($"var {res} = {cast}(new {this.GetTypeString(memberAccess)}());");
             return res;
         }
         else
