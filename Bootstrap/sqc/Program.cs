@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -14,6 +16,36 @@ using Microsoft.CodeAnalysis.CSharp;
 using Squint.Compiler.Syntax;
 
 namespace Squint.Compiler;
+
+public class CompilerArgs
+{
+    public bool DumpCSharp { get; set; }
+    public bool Run { get; set; }
+    public string OutputName { get; set; } = "out";
+    public IList<string> SourceFiles { get; set; } = new List<string>();
+
+    public static CompilerArgs Parse(string[] args)
+    {
+        var result = new CompilerArgs();
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            if (!arg.StartsWith("-"))
+            {
+                // Assumed to be an input file
+                result.SourceFiles.Add(arg);
+                continue;
+            }
+            // Some kind of flag
+            if (arg == "--run") result.Run = true;
+            else if (arg == "--dump-cs") result.DumpCSharp = true;
+            else if (arg == "--out") result.OutputName = args[++i];
+            else throw new InvalidOperationException();
+        }
+        if (result.SourceFiles.Count == 0) throw new InvalidOperationException();
+        return result;
+    }
+}
 
 internal class Program
 {
@@ -80,38 +112,30 @@ internal class Program
 
     private static void Main(string[] args)
     {
-        if (args.Length < 1)
-        {
-            Console.WriteLine("Usage: sqc <file> [options]");
-            Environment.Exit(1);
-            return;
-        }
+        var compilerArgs = CompilerArgs.Parse(args);
 
-        var text = File.ReadAllText(args[0]);
-        var output = "out";
-        var ast = Ast.Parse(text);
-        SymbolResolution.Resolve(ast);
+        // Combine syntax trees
+        var asts = compilerArgs.SourceFiles
+            .Select(f => (Decl)Ast.Parse(File.ReadAllText(f)))
+            .ToImmutableList();
+        var ast = new Decl.Seq(asts);
+        var symbolTable = new SymbolTable();
+        SymbolResolution.Resolve(ast, symbolTable);
         var code = Codegen.Generate(ast);
 
-        if (args.Contains("--dump-cs"))
+        if (compilerArgs.DumpCSharp)
         {
             Console.WriteLine("// GENERATED C# CODE ///////////////////////////////////////////////////////////");
             Console.WriteLine(code);
             Console.WriteLine("////////////////////////////////////////////////////////////////////////////////");
         }
 
-        if (args.Contains("--out"))
-        {
-            var idx = Array.IndexOf(args, "--out");
-            output = args[idx + 1];
-        }
-
-        if (!CompileCSharp(code, output))
+        if (!CompileCSharp(code, compilerArgs.OutputName))
         {
             Environment.Exit(1);
             return;
         }
 
-        if (args.Contains("--run")) Execute(output);
+        if (compilerArgs.Run) Execute(compilerArgs.OutputName);
     }
 }

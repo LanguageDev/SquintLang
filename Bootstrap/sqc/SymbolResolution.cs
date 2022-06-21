@@ -74,11 +74,56 @@ public sealed record class Scope(
         this.ReferenceOpt(name) ?? throw new InvalidOperationException();
 }
 
+public sealed class SymbolTable
+{
+    private static Scope MakeScope(ScopeKind kind, Scope? parent = null) =>
+        new(parent, new Dictionary<string, Symbol>(), kind);
+
+    public Scope GlobalScope { get; }
+    public Scope CurrentScope { get; private set; }
+
+    public SymbolTable()
+    {
+        this.GlobalScope = MakeScope(ScopeKind.Global);
+        this.CurrentScope = this.GlobalScope;
+
+        void DefineBuiltinType(string name, string? realName = null) =>
+            this.GlobalScope.Define(new(name, SymbolKind.Type)
+            {
+                FullName = realName ?? name,
+            });
+
+        DefineBuiltinType("object");
+        DefineBuiltinType("string");
+        DefineBuiltinType("char");
+        DefineBuiltinType("int");
+        DefineBuiltinType("bool");
+        DefineBuiltinType("unit", "void");
+
+        DefineBuiltinType("int8", "sbyte");
+        DefineBuiltinType("int16", "short");
+        DefineBuiltinType("int32", "int");
+        DefineBuiltinType("int64", "long");
+
+        DefineBuiltinType("uint8", "byte");
+        DefineBuiltinType("uint16", "ushort");
+        DefineBuiltinType("uint32", "uint");
+        DefineBuiltinType("uint64", "ulong");
+
+        // HACK: We register some namespaces
+        this.GlobalScope.Define(new("System", SymbolKind.Namespace));
+    }
+
+    public void PushScope(ScopeKind kind) => this.CurrentScope = MakeScope(kind, this.CurrentScope);
+    public void PopScope() => this.CurrentScope = this.CurrentScope.Parent
+                                                ?? throw new InvalidOperationException();
+}
+
 public static class SymbolResolution
 {
-    public static void Resolve(Ast ast)
+    public static void Resolve(Ast ast, SymbolTable symbolTable)
     {
-        new Pass1().Pass(ast);
+        new Pass1(symbolTable).Pass(ast);
         new Pass2().Pass(ast);
         new Pass3().Pass(ast);
     }
@@ -86,78 +131,48 @@ public static class SymbolResolution
     // Define scope and order-independent symbols
     private sealed class Pass1 : AstVisitor<object>
     {
-        private static Scope MakeScope(ScopeKind kind, Scope? parent = null) =>
-            new(parent, new Dictionary<string, Symbol>(), kind);
+        private readonly SymbolTable symbolTable;
 
-        private readonly Scope globalScope;
-        private Scope currentScope;
+        private Scope CurrentScope => this.symbolTable.CurrentScope;
 
-        public Pass1()
+        private void PushScope(ScopeKind scopeKind) => this.symbolTable.PushScope(scopeKind);
+        private void PopScope() => this.symbolTable.PopScope();
+
+        public Pass1(SymbolTable symbolTable)
         {
-            this.globalScope = MakeScope(ScopeKind.Global);
-            this.currentScope = this.globalScope;
-
-            void DefineBuiltinType(string name, string? realName = null) =>
-                this.globalScope.Define(new(name, SymbolKind.Type)
-                {
-                    FullName = realName ?? name,
-                });
-
-            DefineBuiltinType("object");
-            DefineBuiltinType("string");
-            DefineBuiltinType("char");
-            DefineBuiltinType("int");
-            DefineBuiltinType("bool");
-            DefineBuiltinType("unit", "void");
-
-            DefineBuiltinType("int8", "sbyte");
-            DefineBuiltinType("int16", "short");
-            DefineBuiltinType("int32", "int");
-            DefineBuiltinType("int64", "long");
-
-            DefineBuiltinType("uint8", "byte");
-            DefineBuiltinType("uint16", "ushort");
-            DefineBuiltinType("uint32", "uint");
-            DefineBuiltinType("uint64", "ulong");
-
-            // HACK: We register some namespaces
-            this.globalScope.Define(new("System", SymbolKind.Namespace));
+            this.symbolTable = symbolTable;
         }
-
-        private void PushScope(ScopeKind kind) => this.currentScope = MakeScope(kind, this.currentScope);
-        private void PopScope() => this.currentScope = this.currentScope.Parent
-                                                    ?? throw new InvalidOperationException();
 
         public void Pass(Ast ast) => this.Visit(ast);
 
         protected override object Visit(Stmt stmt)
         {
-            stmt.Scope = this.currentScope;
+            stmt.Scope = this.CurrentScope;
             return base.Visit(stmt);
         }
 
         protected override object Visit(Decl decl)
         {
-            decl.Scope = this.currentScope;
+            decl.Scope = this.CurrentScope;
             return base.Visit(decl);
         }
 
         protected override object Visit(Expr expr)
         {
-            expr.Scope = this.currentScope;
+            expr.Scope = this.CurrentScope;
             return base.Visit(expr);
         }
 
         protected override object Visit(Pattern pattern)
         {
-            pattern.Scope = this.currentScope;
+            pattern.Scope = this.CurrentScope;
             return base.Visit(pattern);
         }
 
         protected override object Visit(Decl.Func func)
         {
             func.Signature.Symbol = new(func.Signature.Name, SymbolKind.Func);
-            this.currentScope.Define(func.Signature.Symbol);
+            this.CurrentScope.Define(func.Signature.Symbol);
 
             this.PushScope(ScopeKind.Function);
             base.Visit(func);
@@ -168,7 +183,7 @@ public static class SymbolResolution
         protected override object Visit(Decl.Record record)
         {
             record.Symbol = new(record.Name, SymbolKind.Type);
-            this.currentScope.Define(record.Symbol);
+            this.CurrentScope.Define(record.Symbol);
 
             this.PushScope(ScopeKind.Type);
             base.Visit(record);
@@ -179,14 +194,14 @@ public static class SymbolResolution
         protected override object Visit(Decl.Enum @enum)
         {
             @enum.Symbol = new(@enum.Name, SymbolKind.Type);
-            this.currentScope.Define(@enum.Symbol);
+            this.CurrentScope.Define(@enum.Symbol);
 
             this.PushScope(ScopeKind.Type);
             base.Visit(@enum);
             this.PopScope();
 
             // Propagate up variant symbols with the full name
-            foreach (var v in @enum.Variants) this.currentScope.Define(v.Symbol!, v.Symbol!.FullName);
+            foreach (var v in @enum.Variants) this.CurrentScope.Define(v.Symbol!, v.Symbol!.FullName);
 
             return this.Default;
         }
@@ -199,7 +214,7 @@ public static class SymbolResolution
                 Supertype = enumVariant.Parent!.Symbol,
                 IsArgless = enumVariant.Members is null,
             };
-            this.currentScope.Define(enumVariant.Symbol);
+            this.CurrentScope.Define(enumVariant.Symbol);
 
             this.PushScope(ScopeKind.Type);
             base.Visit(enumVariant);
@@ -245,8 +260,8 @@ public static class SymbolResolution
         {
             this.PushScope(ScopeKind.Loop);
             // NOTE: We don't register them, lookup is based on scope
-            this.currentScope.BreakSymbol = new("", SymbolKind.Label);
-            this.currentScope.ContinueSymbol = new("", SymbolKind.Label);
+            this.CurrentScope.BreakSymbol = new("", SymbolKind.Label);
+            this.CurrentScope.ContinueSymbol = new("", SymbolKind.Label);
             base.Visit(@while);
             this.PopScope();
             return this.Default;
@@ -256,8 +271,8 @@ public static class SymbolResolution
         {
             this.PushScope(ScopeKind.Loop);
             // NOTE: We don't register them, lookup is based on scope
-            this.currentScope.BreakSymbol = new("", SymbolKind.Label);
-            this.currentScope.ContinueSymbol = new("", SymbolKind.Label);
+            this.CurrentScope.BreakSymbol = new("", SymbolKind.Label);
+            this.CurrentScope.ContinueSymbol = new("", SymbolKind.Label);
             base.Visit(@for);
             this.PopScope();
             return this.Default;

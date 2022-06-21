@@ -1,0 +1,67 @@
+
+#[derive(Equatable, ToString)]
+type Span(val From: int, val To: int);
+
+#[derive(Equatable, ToString)]
+type TokenType =
+    | End
+    | Unknown
+    | Identifier
+    | LiteralInt
+    ;
+
+#[derive(ToString)]
+type Token(val Text: string, val Kind: TokenType, val Span: Span);
+
+type Lexer(val Text: string, var Offset: int);
+
+impl Lexer {
+    // NOTE: Named arguments would be really nice here
+    // Maybe Lexer(Text = text, Offset = 0) ?
+    func new(text: string): Lexer = Lexer(text, 0);
+
+    func next(this): Token {
+        var start = this.Offset;
+
+        func is_end(): bool = this.Offset >= this.Text.Length;
+        func current(): char = this.Text[this.Offset];
+        func step() = this.Offset += 1;
+
+        func consume_while(pred: (char) -> bool) {
+            while (not is_end() and pred(current())) step();
+        }
+
+        func skip() = start = this.Offset;
+        func take(ty: TokenType): Token {
+            val text = this.Text.Substring(start, this.Offset - start);
+            val span = Span(start, this.Offset);
+            return Token(text, ty, span);
+        }
+
+        func is_ident(ch: char): bool = char.IsLetterOrDigit(ch) or ch == '_';
+
+    begin:
+        // EOF
+        if (is_end()) return take(TokenType.End);
+
+        // Space
+        if (char.IsWhiteSpace(current())) {
+            consume_while(char.IsWhiteSpace);
+            skip();
+            goto begin;
+        }
+        // Integer literal
+        if (char.IsDigit(current())) {
+            consume_while(char.IsDigit);
+            return take(TokenType.LiteralInt);
+        }
+        // Identifier
+        if (is_ident(current())) {
+            consume_while(is_ident);
+            return take(TokenType.Identifier);
+        }
+        // Unknown
+        step();
+        return take(TokenType.Unknown);
+    }
+}
