@@ -104,7 +104,6 @@ impl Lexer {
         // Line comment
         if (matches("//")) {
             consume_while(negate(is_end_of_line));
-            step();
             return take(TokenType.LineComment);
         }
 

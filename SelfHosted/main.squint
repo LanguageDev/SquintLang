@@ -1,10 +1,15 @@
 import System.Console.WriteLine;
+import System.IO.File;
 
 func main() {
-    val lexer = Lexer.new("hello world 123 hi_3");
+    var text = File.ReadAllText("lexer.squint");
+    val lexer = Lexer.new(text);
+    var unknownCount = 0;
     while (true) {
         val token = lexer.next();
         WriteLine(token);
         if (token.Kind.Equals(TokenType.End)) goto break;
+        if (token.Kind.Equals(TokenType.Unknown)) unknownCount += 1;
     }
+    WriteLine("$unknownCount unknown tokens");
 }
