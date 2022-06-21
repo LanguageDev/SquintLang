@@ -222,6 +222,23 @@ public static class SymbolResolution
             return this.Default;
         }
 
+        protected override object Visit(Decl.Trait trait)
+        {
+            trait.Symbol = new(trait.Name, SymbolKind.Type);
+            this.CurrentScope.Define(trait.Symbol);
+
+            this.PushScope(ScopeKind.Type);
+
+            // This is also a type refering to the implementor type
+            var thisSymbol = new Symbol("This", SymbolKind.Type);
+            this.CurrentScope.Define(thisSymbol);
+
+            base.Visit(trait);
+            this.PopScope();
+
+            return this.Default;
+        }
+
         protected override object Visit(Decl.FuncSignature funcSignature)
         {
             base.Visit(funcSignature);

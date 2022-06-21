@@ -64,26 +64,29 @@ public sealed class Codegen : AstVisitor<string>
                     result.AppendLine($"public {ty} {name} {{ {getSet} }}");
                 }
 
-                // Ctor
-                result
-                    .Append($"public {this.Name}(")
-                    .AppendJoin(", ", this.Properties.Select(m => $"{m.Type} {m.Name}"))
-                    .AppendLine(")")
-                    .AppendLine("{");
-                foreach (var m in this.Properties) result.AppendLine($"this.{m.Name} = {m.Name};");
-                result.AppendLine("}");
+                if (this.Kind != "interface")
+                {
+                    // Ctor
+                    result
+                        .Append($"public {this.Name}(")
+                        .AppendJoin(", ", this.Properties.Select(m => $"{m.Type} {m.Name}"))
+                        .AppendLine(")")
+                        .AppendLine("{");
+                    foreach (var m in this.Properties) result.AppendLine($"this.{m.Name} = {m.Name};");
+                    result.AppendLine("}");
 
-                // Deconstruction
-                // NOTE: For easier codegen destructure returns true
-                result
-                    .Append("public bool Deconstruct(")
-                    .AppendJoin(", ", this.Properties.Select(m => $"out {m.Type} {m.Name}"))
-                    .AppendLine(")")
-                    .AppendLine("{");
-                foreach (var m in this.Properties) result.AppendLine($"{m.Name} = this.{m.Name};");
-                result
-                    .AppendLine("return true;")
-                    .AppendLine("}");
+                    // Deconstruction
+                    // NOTE: For easier codegen destructure returns true
+                    result
+                        .Append("public bool Deconstruct(")
+                        .AppendJoin(", ", this.Properties.Select(m => $"out {m.Type} {m.Name}"))
+                        .AppendLine(")")
+                        .AppendLine("{");
+                    foreach (var m in this.Properties) result.AppendLine($"{m.Name} = this.{m.Name};");
+                    result
+                        .AppendLine("return true;")
+                        .AppendLine("}");
+                }
 
                 // Custom code
                 result.AppendLine(this.CodeBuilder.ToString().TrimEnd());
@@ -172,6 +175,9 @@ public static class Globals
         ScopeKind.Global => false,
         _ => throw new NotImplementedException(),
     };
+
+    private static bool IsInstance(Decl.FuncSignature f) =>
+        f.Params.Count > 0 && f.Params[0].Name == "this";
 
     private static string EscapeKeyword(string str) => str switch
     {
@@ -271,10 +277,13 @@ public static class Globals
         var builder = this.GetTypeBuilder(record.Symbol!);
 
         // Properties
-        foreach (var m in record.Members)
+        if (record.Members is not null)
         {
-            var ty = this.GetTypeString(m.Type);
-            builder.Properties.Add(new(ty, m.Name, m.Mutable));
+            foreach (var m in record.Members)
+            {
+                var ty = this.GetTypeString(m.Type);
+                builder.Properties.Add(new(ty, m.Name, m.Mutable));
+            }
         }
         
         return this.Default;
@@ -312,6 +321,39 @@ public static class Globals
         return this.Default;
     }
 
+    protected override string Visit(Decl.Trait trait)
+    {
+        var builder = this.GetTypeBuilder(trait.Symbol!);
+        builder.Kind = "interface";
+        builder.Open = true;
+
+        foreach (var member in trait.Members)
+        {
+            if (member is Decl.FuncSignature f)
+            {
+                // NOTE: We just skip static methods from the declaration for now
+                if (!IsInstance(f)) continue;
+
+                var relParams = f.Params.Skip(1);
+                var retType = f.Ret is null ? "void" : this.GetTypeString(f.Ret);
+                builder.CodeBuilder
+                    .Append("public ")
+                    .Append(retType)
+                    .Append(' ')
+                    .Append(f.Name)
+                    .Append('(')
+                    .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {this.GetLocalName(p.Symbol!)}"))
+                    .Append(");");
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        return this.Default;
+    }
+
     protected override string Visit(Decl.Impl impl)
     {
         var typeSymbol = impl.Target switch
@@ -335,7 +377,7 @@ public static class Globals
     {
         var retType = func.Signature.Ret is null ? "void" : this.GetTypeString(func.Signature.Ret);
         this.funcReturnTypes.Push(retType);
-        var isInstance = func.Signature.Params.Count > 0 && func.Signature.Params[0].Name == "this";
+        var isInstance = IsInstance(func.Signature);
         var isOverride = func.Attributes.Any(attr => attr.Name == "override");
 
         var relParams = isInstance ? func.Signature.Params.Skip(1) : func.Signature.Params;
