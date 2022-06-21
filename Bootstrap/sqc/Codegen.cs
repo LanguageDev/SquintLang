@@ -185,6 +185,9 @@ public static class Globals
         _ => str,
     };
 
+    private static bool IsEffectFreeValue(string str) =>
+        str == "default";
+
     private TypeBuilder GetTypeBuilder(Symbol symbol)
     {
         var builderMap = symbol.Supertype is null
@@ -462,7 +465,7 @@ public static class Globals
     {
         // We need to still generate the expression, as it can contain side-effects
         var value = this.Visit(exp.Expr);
-        this.CodeBuilder.AppendLine($"{DeVoid(value)};");
+        if (!IsEffectFreeValue(value)) this.CodeBuilder.AppendLine($"{DeVoid(value)};");
         return this.Default;
     }
 

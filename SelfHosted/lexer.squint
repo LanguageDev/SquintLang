@@ -1,3 +1,4 @@
+import System.Collections.Generic.Stack[T];
 import System.Linq.Enumerable.Range;
 import System.NotImplementedException;
 
@@ -13,6 +14,7 @@ type TokenType =
 
     // Trivia
     | Whitespace
+    | Newline
     | LineComment
 
     // Binary operators
@@ -45,8 +47,8 @@ type TokenType =
     | LitInt | LitChar
     // String literal components
     | LitStrStart | LitStrEnd
-    | LitStrElement | LitStrDollar | LitStrName
-    | LitStrOpenCurly | LitStrCloseCurly
+    | LitStrElement | LitStrInterpolateName
+    | LitStrInterpolateStart
     ;
 
 #[derive(ToString)]
@@ -58,19 +60,21 @@ type LexerMode =
     | String
     ;
 
-type Lexer(val Text: string, var Offset: int, var Mode: LexerMode);
+type Lexer(
+    val Text: string,
+    var Offset: int,
+    var ModeStack: Stack[LexerMode]);
 
 impl Lexer {
     // NOTE: Named arguments would be really nice here
     // Maybe Lexer(Text = text, Offset = 0) ?
-    func new(text: string): Lexer = Lexer(text, 0, LexerMode.Normal);
+    func new(text: string): Lexer {
+        val stk = Stack[LexerMode]();
+        stk.Push(LexerMode.Normal);
+        return Lexer(text, 0, stk);
+    }
 
-    func next(this): Token = match (this.Mode) {
-    | LexerMode.Normal -> this.next_normal()
-    | _ -> throw NotImplementedException("Lexer mode ${this.Mode} is not supported!")
-    };
-
-    func next_normal(this): Token {
+    func next(this): Token {
         var start = this.Offset;
 
         func is_end(): bool = this.Offset >= this.Text.Length;
@@ -98,6 +102,12 @@ impl Lexer {
 
         func is_ident(ch: char): bool = char.IsLetterOrDigit(ch) or ch == '_';
         func is_end_of_line(ch: char): bool = ch == '\n' or ch == '\r';
+        func is_str_element(ch: char): bool =
+            not char.IsControl(ch) and ch != '$' and ch != '\\' and ch != '"';
+        func is_escape(ch: char, additional: string): bool =
+            "abfnrtv\\".Contains(ch) or additional.Contains(ch);
+        func is_space(ch: char): bool =
+            ch != '\r' and ch != '\n' and char.IsWhiteSpace(ch);
         func negate(pred: (char) -> bool): (char) -> bool {
             func f(ch: char): bool = not pred(ch);
             return f;
@@ -106,9 +116,27 @@ impl Lexer {
         // EOF
         if (is_end()) return take(TokenType.End);
 
+        match (this.ModeStack.Peek()) {
+        | LexerMode.Normal -> goto next_normal;
+        | LexerMode.String -> goto next_string;
+        | _ -> throw NotImplementedException("Lexer mode ${this.ModeStack.Peek()} is not supported!");
+        }
+
+    next_normal:
+        // Newline
+        if (current() == '\r') {
+            step();
+            if (not is_end() and current() == '\n') step();
+            return take(TokenType.Newline);
+        }
+        if (current() == '\n') {
+            step();
+            return take(TokenType.Newline);
+        }
+
         // Space
-        if (char.IsWhiteSpace(current())) {
-            consume_while(char.IsWhiteSpace);
+        if (is_space(current())) {
+            consume_while(is_space);
             return take(TokenType.Whitespace);
         }
 
@@ -171,7 +199,36 @@ impl Lexer {
             return Token(result.Text, kind, result.Span);
         }
 
-        // Unknown
+        // Char literal
+        if (current() == '\'') {
+            step();
+            // TODO: Error reporting?
+            if (is_end()) return take(TokenType.Unknown);
+            if (current() == '\\') {
+                step();
+                // TODO: Error reporting?
+                if (is_end()) return take(TokenType.Unknown);
+                val escaped = current();
+                step();
+                // TODO: Error reporting?
+                if (not is_escape(escaped, "'")) return take(TokenType.Unknown);
+            }
+            else if (not char.IsControl(current())) {
+                step();
+            }
+            else {
+                // TODO: Error reporting?
+                return take(TokenType.Unknown);
+            }
+            // TODO: Error reporting?
+            if (is_end()) return take(TokenType.Unknown);
+            // TODO: Error reporting?
+            if (current() != '\'') return take(TokenType.Unknown);
+            step();
+            return take(TokenType.LitChar);
+        }
+
+        // Single-letter
         val ch = current();
         step();
         val ty = match (ch) {
@@ -190,12 +247,54 @@ impl Lexer {
         | '|' -> TokenType.Pipe
         | '(' -> TokenType.OpenParen
         | ')' -> TokenType.CloseParen
-        | '{' -> TokenType.OpenBrace
-        | '}' -> TokenType.CloseBrace
         | '[' -> TokenType.OpenBracket
         | ']' -> TokenType.CloseBracket
+        | '{' -> { this.ModeStack.Push(LexerMode.Normal); TokenType.OpenBrace }
+        | '}' -> { this.ModeStack.Pop(); TokenType.CloseBrace }
+        | '"' -> { this.ModeStack.Push(LexerMode.String); TokenType.LitStrStart }
+        // TODO: Error reporting?
         | _ -> TokenType.Unknown
         };
         return take(ty);
+
+    next_string:
+        if (current() == '"') {
+            this.ModeStack.Pop();
+            step();
+            return take(TokenType.LitStrEnd);
+        }
+        if (current() == '$') {
+            step();
+            // If we have reached the EOF, we just return it as an element
+            if (is_end()) return take(TokenType.LitStrElement);
+            // Otherwise, we can have an open curly or an identifier
+            if (is_ident(current())) {
+                consume_while(is_ident);
+                return take(TokenType.LitStrInterpolateName);
+            }
+            if (current() == '{') {
+                step();
+                this.ModeStack.Push(LexerMode.Normal);
+                return take(TokenType.LitStrInterpolateStart);
+            }
+            // Just a $ element
+            return take(TokenType.LitStrElement);
+        }
+        if (current() == '\\') {
+            step();
+            // TODO: Error reporting?
+            if (is_end()) return take(TokenType.Unknown);
+            val escaped = current();
+            step();
+            // TODO: Error reporting?
+            if (not is_escape(escaped, "\"$")) return take(TokenType.Unknown);
+            return take(TokenType.LitStrElement);
+        }
+        if (is_str_element(current())) {
+            consume_while(is_str_element);
+            return take(TokenType.LitStrElement);
+        }
+        // TODO: Error reporting?
+        return take(TokenType.Unknown);
     }
 }

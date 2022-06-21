@@ -9,7 +9,9 @@ func main() {
     while (true) {
         allCount += 1;
         val token = lexer.next();
-        WriteLine(token);
+        if (not token.Kind.Equals(TokenType.LineComment)
+        and not token.Kind.Equals(TokenType.Whitespace)
+        and not token.Kind.Equals(TokenType.Newline)) WriteLine(token);
         if (token.Kind.Equals(TokenType.End)) goto break;
         if (token.Kind.Equals(TokenType.Unknown)) unknownCount += 1;
     }
