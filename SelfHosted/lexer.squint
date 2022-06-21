@@ -37,7 +37,7 @@ type TokenType =
     // Keywords
     | KwImport
     | KwType | KwTrait | KwFunc | KwVar | KwVal
-    | KwIf | KwElse | KwFor | KwWhile | KwReturn | KwMatch | KwGoto
+    | KwIf | KwElse | KwFor | KwWhile | KwReturn | KwMatch | KwGoto | KwThrow
     | KwCast | KwThis | KwImpl
     | KwTrue | KwFalse
 
@@ -178,6 +178,7 @@ impl Lexer {
             | "this" -> TokenType.KwThis
             | "return" -> TokenType.KwReturn
             | "goto" -> TokenType.KwGoto
+            | "throw" -> TokenType.KwThrow
             | "for" -> TokenType.KwFor
             | "impl" -> TokenType.KwImpl
             | "if" -> TokenType.KwIf
