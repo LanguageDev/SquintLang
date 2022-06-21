@@ -160,7 +160,30 @@ impl Lexer {
         }
 
         // Unknown
+        val ch = current();
         step();
-        return take(TokenType.Unknown);
+        val ty = match (ch) {
+        | '+' -> TokenType.OpAdd
+        | '-' -> TokenType.OpSub
+        | '*' -> TokenType.OpMul
+        | '/' -> TokenType.OpDiv
+        | '=' -> TokenType.OpAsgn
+        | '>' -> TokenType.OpGt
+        | '<' -> TokenType.OpLt
+        | '.' -> TokenType.Dot
+        | ',' -> TokenType.Comma
+        | ':' -> TokenType.Colon
+        | ';' -> TokenType.SemiColon
+        | '#' -> TokenType.Hash
+        | '|' -> TokenType.Pipe
+        | '(' -> TokenType.OpenParen
+        | ')' -> TokenType.CloseParen
+        | '{' -> TokenType.OpenBrace
+        | '}' -> TokenType.CloseBrace
+        | '[' -> TokenType.OpenBracket
+        | ']' -> TokenType.CloseBracket
+        | _ -> TokenType.Unknown
+        };
+        return take(ty);
     }
 }
