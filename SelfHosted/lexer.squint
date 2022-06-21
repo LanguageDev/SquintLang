@@ -1,13 +1,51 @@
+import System.Linq.Enumerable.Range;
 
 #[derive(Equatable, ToString)]
 type Span(val From: int, val To: int);
 
 #[derive(Equatable, ToString)]
 type TokenType =
+    // End of input
     | End
+    // Unknown
     | Unknown
-    | Identifier
-    | LiteralInt
+
+    // Trivia
+    | Whitespace
+    | LineComment
+
+    // Binary operators
+    | OpAdd | OpSub | OpMul | OpDiv | OpMod | OpRem
+    // Assignment operators
+    | OpAsgn | OpAddAsgn | OpSubAsgn | OpMulAsgn | OpDivAsgn
+    // Comparison operators
+    | OpEq | OpNeq | OpLt | OpLte | OpGt | OpGte | KwIn
+    // Logical operators
+    | OpAnd | OpOr | OpNot
+
+    // Punctuation
+    | Dot | Comma | Colon | SemiColon | Hash | Pipe | Arrow
+
+    // Pairwise
+    | OpenParen | CloseParen
+    | OpenBrace | CloseBrace
+    | OpenBracket | CloseBracket
+
+    // Keywords
+    | KwImport
+    | KwType | KwTrait | KwFunc | KwVar | KvVar
+    | KwIf | KwElse | KwFor | KwWhile | KwReturn | KwMatch | KwGoto
+    | KwCast | KwThis | KwImpl
+    | KwTrue | KwFalse
+
+    // Names and literals
+    | Discard
+    | Name
+    | LitInt | LitChar
+    // String literal components
+    | LitStrStart | LitStrEnd
+    | LitStrElement | LitStrDollar | LitStrName
+    | LitStrOpenCurly | LitStrCloseCurly
     ;
 
 #[derive(ToString)]
@@ -31,14 +69,27 @@ impl Lexer {
             while (not is_end() and pred(current())) step();
         }
 
-        func skip() = start = this.Offset;
         func take(ty: TokenType): Token {
             val text = this.Text.Substring(start, this.Offset - start);
             val span = Span(start, this.Offset);
             return Token(text, ty, span);
         }
 
+        func matches(text: string): bool {
+            if (this.Offset + text.Length > this.Text.Length) return false;
+            for (i in Range(0, text.Length)) {
+                if (text[i] != this.Text[this.Offset + i]) return false;
+            }
+            this.Offset += text.Length;
+            return true;
+        }
+
         func is_ident(ch: char): bool = char.IsLetterOrDigit(ch) or ch == '_';
+        func is_end_of_line(ch: char): bool = ch == '\n' or ch == '\r';
+        func negate(pred: (char) -> bool): (char) -> bool {
+            func f(ch: char): bool = not pred(ch);
+            return f;
+        }
 
     begin:
         // EOF
@@ -47,19 +98,16 @@ impl Lexer {
         // Space
         if (char.IsWhiteSpace(current())) {
             consume_while(char.IsWhiteSpace);
-            skip();
-            goto begin;
+            return take(TokenType.Whitespace);
         }
-        // Integer literal
-        if (char.IsDigit(current())) {
-            consume_while(char.IsDigit);
-            return take(TokenType.LiteralInt);
+
+        // Line comment
+        if (matches("//")) {
+            consume_while(negate(is_end_of_line));
+            step();
+            return take(TokenType.LineComment);
         }
-        // Identifier
-        if (is_ident(current())) {
-            consume_while(is_ident);
-            return take(TokenType.Identifier);
-        }
+
         // Unknown
         step();
         return take(TokenType.Unknown);

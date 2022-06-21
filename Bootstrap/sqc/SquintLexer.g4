@@ -68,7 +68,7 @@ KW_FALSE : 'false' ;
 DISCARD : '_' ;
 IDENTIFIER : [A-Za-z_][A-Za-z0-9_]* ;
 INT_LITERAL : [0-9]+ ;
-CHAR_LITERAL : '\'' (~('\n' | '\r' | '\'') | ('\'' [abfnrtv'\\])) '\'' ;
+CHAR_LITERAL : '\'' (~[\r\n'\\] | ('\\' [abfnrtv'\\])) '\'' ;
 
 OPEN_QUOTE : '"' -> pushMode(LineString) ;
 
@@ -76,7 +76,7 @@ mode LineString ;
 
 CLOSE_QUOTE : '"' -> popMode ;
 
-STR_LIT_ELEMENT : ~('\\' | '"' | '$')+
+STR_LIT_ELEMENT : ~[\\"$]+
                 | '$'
                 | ('\\' [abfnrtv"\\$])
                 ;
