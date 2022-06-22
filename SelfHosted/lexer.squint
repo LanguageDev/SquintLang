@@ -1,9 +1,8 @@
 import System.Collections.Generic.Stack[T];
+import System.Collections.Generic.IEnumerable[T];
+import System.Collections.Generic.List[T];
 import System.Linq.Enumerable.Range;
 import System.NotImplementedException;
-
-#[derive(Equatable, ToString)]
-type Span(val From: int, val To: int);
 
 #[derive(Equatable, ToString)]
 type TokenType =
@@ -52,7 +51,7 @@ type TokenType =
     ;
 
 #[derive(ToString)]
-type Token(val Text: string, val Kind: TokenType, val Span: Span);
+type Token(val Text: string, val Kind: TokenType);
 
 #[derive(Equatable, ToString)]
 type LexerMode =
@@ -66,6 +65,21 @@ type Lexer(
     var ModeStack: Stack[LexerMode]);
 
 impl Lexer {
+    // TODO: We shouldn't return a List here, it should rather be some lazy
+    // sequence, like a generator
+    func tokenize(text: string): List[Token] {
+        val lexer = Lexer.new(text);
+        val tokens = List[Token]();
+        while (true) {
+            val token = lexer.next();
+            tokens.Add(token);
+            // NOTE: It would really help to have == operator for types that
+            // derive Equatable
+            if (token.Kind.Equals(TokenType.End)) goto break;
+        }
+        return tokens;
+    }
+
     // NOTE: Named arguments would be really nice here
     // Maybe Lexer(Text = text, Offset = 0) ?
     func new(text: string): Lexer {
@@ -88,8 +102,7 @@ impl Lexer {
 
         func take(ty: TokenType): Token {
             val text = this.Text.Substring(start, this.Offset - start);
-            val span = Span(start, this.Offset);
-            return Token(text, ty, span);
+            return Token(text, ty);
         }
 
         func matches(text: string): bool {
@@ -198,7 +211,7 @@ impl Lexer {
             | "_" -> TokenType.Discard
             | _ -> TokenType.Name
             };
-            return Token(result.Text, kind, result.Span);
+            return Token(result.Text, kind);
         }
 
         // Char literal

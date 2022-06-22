@@ -70,8 +70,12 @@ public sealed record class Scope(
         return null;
     }
 
-    public Symbol Reference(string name) =>
-        this.ReferenceOpt(name) ?? throw new InvalidOperationException();
+    public Symbol Reference(string name)
+    {
+        var result = this.ReferenceOpt(name);
+        if (result is null) CompilerError.Report($"Undefined symbol '{name}'");
+        return result;
+    }
 }
 
 public sealed class SymbolTable
@@ -337,7 +341,8 @@ public static class SymbolResolution
             }
             else
             {
-                throw new InvalidOperationException();
+                var gen = import.Generics.Count == 0 ? "" : $"[{string.Join(", ", import.Generics)}]";
+                CompilerError.Report($"Can't resolve import {string.Join(".", import.Parts)}{gen}");
             }
 
             import.Scope!.Define(symbol);

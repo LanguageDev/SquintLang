@@ -1,1 +1,24 @@
+import System.Collections.Immutable.ImmutableList[T];
+import System.Collections.Generic.IEnumerable[T];
+import System.Collections.Generic.IEnumerator[T];
+import System.Collections.Generic.Queue[T];
 
+#[derive(ToString)]
+type SyntaxTrivia(val Token: Token);
+
+#[derive(ToString)]
+type SyntaxToken(
+    val Token: Token,
+    val LeadingTrivia: ImmutableList[SyntaxTrivia],
+    val TrailingTrivia: ImmutableList[SyntaxTrivia]);
+
+type Parser(
+    val RawTokenSource: IEnumerator[Token],
+    val RawTokenPeek: Queue[Token],
+    val SyntaxTokenPeek: Queue[SyntaxToken]);
+
+impl Parser {
+    // NOTE: Again, named args would help a lot in readability
+    func new(tokens: IEnumerable[Token]): Parser =
+        Parser(tokens.GetEnumerator(), Queue[Token](), Queue[SyntaxToken]());
+}

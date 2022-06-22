@@ -114,28 +114,36 @@ internal class Program
     {
         var compilerArgs = CompilerArgs.Parse(args);
 
-        // Combine syntax trees
-        var asts = compilerArgs.SourceFiles
-            .Select(f => (Decl)Ast.Parse(File.ReadAllText(f)))
-            .ToImmutableList();
-        var ast = new Decl.Seq(asts);
-        var symbolTable = new SymbolTable();
-        SymbolResolution.Resolve(ast, symbolTable);
-        var code = Codegen.Generate(ast);
-
-        if (compilerArgs.DumpCSharp)
+        try
         {
-            Console.WriteLine("// GENERATED C# CODE ///////////////////////////////////////////////////////////");
-            Console.WriteLine(code);
-            Console.WriteLine("////////////////////////////////////////////////////////////////////////////////");
-        }
+            // Combine syntax trees
+            var asts = compilerArgs.SourceFiles
+                .Select(f => (Decl)Ast.Parse(File.ReadAllText(f)))
+                .ToImmutableList();
+            var ast = new Decl.Seq(asts);
+            var symbolTable = new SymbolTable();
+            SymbolResolution.Resolve(ast, symbolTable);
+            var code = Codegen.Generate(ast);
 
-        if (!CompileCSharp(code, compilerArgs.OutputName))
+            if (compilerArgs.DumpCSharp)
+            {
+                Console.WriteLine("// GENERATED C# CODE ///////////////////////////////////////////////////////////");
+                Console.WriteLine(code);
+                Console.WriteLine("////////////////////////////////////////////////////////////////////////////////");
+            }
+
+            if (!CompileCSharp(code, compilerArgs.OutputName))
+            {
+                Environment.Exit(1);
+                return;
+            }
+
+            if (compilerArgs.Run) Execute(compilerArgs.OutputName);
+        }
+        catch (CompilerError err)
         {
-            Environment.Exit(1);
-            return;
+            Console.WriteLine("Compiler error:");
+            Console.WriteLine(err.Message);
         }
-
-        if (compilerArgs.Run) Execute(compilerArgs.OutputName);
     }
 }
