@@ -75,6 +75,7 @@ impl Lexer {
     }
 
     func next(this): Token {
+    begin:
         var start = this.Offset;
 
         func is_end(): bool = this.Offset >= this.Text.Length;
@@ -295,7 +296,13 @@ impl Lexer {
             consume_while(is_str_element);
             return take(TokenType.LitStrElement);
         }
+        // If it's a newline, we pop the stack to so into normal mode
+        if (current() == '\r' or current() == '\n') {
+            this.ModeStack.Pop();
+            goto begin;
+        }
         // TODO: Error reporting?
+        step();
         return take(TokenType.Unknown);
     }
 }
