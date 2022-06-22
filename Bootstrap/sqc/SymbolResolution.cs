@@ -441,7 +441,7 @@ public static class SymbolResolution
         {
             this.Visit(@for.Iterated);
             @for.IteratorSymbol = new(@for.Iterator, SymbolKind.Local);
-            @for.Scope!.Define(@for.IteratorSymbol);
+            @for.Body.Scope!.Define(@for.IteratorSymbol);
             this.Visit(@for.Body);
             return this.Default;
         }
