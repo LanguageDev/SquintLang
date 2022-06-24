@@ -13,8 +13,12 @@
         "languages": [{
             "id": "squint",
             "aliases": ["Squint", "squint"],
-            "extensions": [".squint .sq"],
-            "configuration": "./language-configuration.json"
+            "extensions": [".squint", ".sq"],
+            "configuration": "./language-configuration.json",
+            "icon": {
+                "light": "./icons/squint.svg",
+                "dark": "./icons/squint.svg"
+            }
         }],
         "grammars": [{
             "language": "squint",

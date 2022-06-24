@@ -9,5 +9,6 @@ doc
 TestResults
 CoverageResults
 node_modules
+*.vsix
 
 !.vscode/launch.json

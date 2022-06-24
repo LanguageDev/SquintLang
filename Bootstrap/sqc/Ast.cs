@@ -61,6 +61,7 @@ public abstract record class Decl : Stmt
         ImmutableList<string> Parts,
         ImmutableList<GenericParam> Generics) : Decl;
     public sealed record class FuncSignature(
+        bool Async,
         string Name,
         ImmutableList<GenericParam> Generics,
         ImmutableList<FuncParam> Params,
@@ -210,6 +211,7 @@ public static class AstConverter
             ? new Decl.Impl(ToType(impl.type(1)), ToType(impl.type(0)), impl.impl_member_declaration().Select(ToDecl).ToImmutableList())
             : new Decl.Impl(ToType(impl.type(0)), null, impl.impl_member_declaration().Select(ToDecl).ToImmutableList()),
         SquintParser.Function_signatureContext s => new Decl.FuncSignature(
+            s.async() is not null,
             s.name().GetText(),
             ToGenerics(s.generic_param_list()),
             s.parameter_list().parameter().Select(ToDecl).Cast<Decl.FuncParam>().ToImmutableList(),
@@ -886,6 +888,7 @@ public abstract class AstTransformer
         this.Transform(func.Body)));
 
     public virtual Decl Transform(Decl.FuncSignature funcSignature) => new Decl.FuncSignature(
+        funcSignature.Async,
         funcSignature.Name,
         this.TransformAll(funcSignature.Generics).Cast<Decl.GenericParam>().ToImmutableList(),
         this.TransformAll(funcSignature.Params).Cast<Decl.FuncParam>().ToImmutableList(),

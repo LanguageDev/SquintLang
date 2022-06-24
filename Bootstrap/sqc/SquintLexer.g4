@@ -64,6 +64,8 @@ KW_IN : 'in' ;
 KW_TRUE : 'true' ;
 KW_FALSE : 'false' ;
 KW_THROW : 'throw' ;
+KW_ASYNC : 'async' ;
+KW_AWAIT : 'await' ;
 
 // Literals
 DISCARD : '_' ;

@@ -21,7 +21,7 @@ import_declaration : 'import' path+=name ('.' path+=name)* generic_param_list? '
 function_declaration : attribute_list function_signature block_statement
                      | attribute_list function_signature '=' expression ';'
                      ;
-function_signature : 'func' name generic_param_list? '(' parameter_list  ')' (':' return_type=type)? ;
+function_signature : async? 'func' name generic_param_list? '(' parameter_list  ')' (':' return_type=type)? ;
 
 type_declaration : record_type_declaration
                  | du_type_declaration
@@ -79,7 +79,7 @@ expression : atom_expression                                                 # w
            | obj=expression '.' member=name                                  # member_access_expression
            | array=expression '[' indices=expression_list ']'                # index_expression
            | func=expression '(' args=expression_list ')'                    # call_expression
-           | op=('+' | '-') subexpr=expression                               # ury_expression
+           | op=('+' | '-' | 'await') subexpr=expression                     # ury_expression
            | left=expression op=('*' | '/' | 'mod' | 'rem') right=expression # bin_expression
            | left=expression op=('+' | '-') right=expression                 # bin_expression
            | left=expression op=rel_op right=expression                      # relational_expression
@@ -144,6 +144,8 @@ pattern : '_'                                # discard_pattern
         | literal                            # literal_pattern
         ;
 pattern_list : (pattern (',' pattern)* ','?)? ;
+
+async : 'async';
 
 name : IDENTIFIER;
 

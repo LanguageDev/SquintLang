@@ -122,10 +122,7 @@ public static class Prelude
 
 public static class Program
 {{
-    public static void Main(string[] args)
-    {{
-        Globals.main();
-    }}
+    {this.MainRaw}
 }}
 
 public static class Globals
@@ -135,6 +132,18 @@ public static class Globals
 
 {string.Join("\n", this.types.Values.Select(b => b.Code))}
 ";
+    private string MainRaw => this.isMainAsync
+        ? @"
+public static async System.Threading.Tasks.Task Main(string[] args)
+{
+    await Globals.main();
+}
+" : @"
+public static void Main(string[] args)
+{
+    Globals.main();
+}
+";
 
     private readonly Dictionary<Symbol, TypeBuilder> types = new();
     private readonly Dictionary<Symbol, string> variables = new();
@@ -143,6 +152,7 @@ public static class Globals
     private readonly Stack<string> funcReturnTypes = new();
     private int tmpCount;
     private int labelCount;
+    private bool isMainAsync;
 
     private StringBuilder CodeBuilder => this.codeStack.Peek();
 
@@ -382,15 +392,21 @@ public static class Globals
         this.funcReturnTypes.Push(retType);
         var isInstance = IsInstance(func.Signature);
         var isOverride = func.Attributes.Any(attr => attr.Name == "override");
+        var isMain = func.Signature.Name == "main" && !isInstance;
+        var isAsync = func.Signature.Async;
+
+        // Save if main is async
+        if (isMain && isAsync) this.isMainAsync = true;
 
         var relParams = isInstance ? func.Signature.Params.Skip(1) : func.Signature.Params;
         var stat = isInstance ? "" : "static";
         var ov = isOverride ? "override" : "";
+        var asyncs = isAsync ? "async" : "";
         var qualifiers = IsFunctionLocal(func.Scope!)
             ? ""
             : $"public {ov} {stat}";
         this.CodeBuilder
-            .Append($"{qualifiers} {retType} {EscapeKeyword(func.Signature.Name)}(")
+            .Append($"{qualifiers} {asyncs} {retType} {EscapeKeyword(func.Signature.Name)}(")
             .AppendJoin(", ", relParams.Select(p => $"{this.GetTypeString(p.Type!)} {this.GetLocalName(p.Symbol!)}"))
             .AppendLine(")")
             .AppendLine("{");
@@ -635,7 +651,7 @@ public static class Globals
         };
 
         var sub = this.Visit(ury.Subexpr);
-        this.CodeBuilder.AppendLine($"var {res} = {op}{sub};");
+        this.CodeBuilder.AppendLine($"var {res} = {op} ({sub});");
 
         return res;
     }

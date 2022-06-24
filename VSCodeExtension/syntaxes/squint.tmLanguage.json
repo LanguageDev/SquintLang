@@ -21,7 +21,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.squint",
-				"match": "\\b(import|if|else|while|for|return|match|func|type|var|val|trait|impl|this|in|goto|break|continue|throw)\\b"
+				"match": "\\b(import|if|else|while|for|return|match|func|type|var|val|trait|impl|this|in|goto|break|continue|throw|async|await)\\b"
 			}]
 		},
         "operators": {
